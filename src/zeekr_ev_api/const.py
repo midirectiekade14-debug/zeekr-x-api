@@ -60,9 +60,9 @@ REGION_LOGIN_SERVERS = {
 }
 
 # Secrets
-HMAC_ACCESS_KEY = "c6163310f263911af87194dd290247fd"  # from libHttpSecretKey.so
-HMAC_SECRET_KEY = "b816ffc222a657bef362d874a60337de"  # from libAppSecret.so
-PASSWORD_PUBLIC_KEY = "MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA1OyKm3Ig/6eibB7Uz2o93UqGk2M784WdfF8mvffvu218d61G5M3Px54E3kefUTk5Ky1ywHvw7Rp9KDuYv7ktaHkk+yr59Ihseu3a7iM/C6SnMSGt+LfB/Bcob9Abw95EigXQ4yQddX9hbNrin3AwZw8wMjEISYYDo5GuYDL0NbAiYg2Y5GpfYIqRzoi6GqDz+evLrsl20kJeCEPgJZN4Jg00Iq9k++EKOZ5Jc/Zx22ZUgKpdwKABkvzshEgG6WWUPB+gosOiLv++inu/9blDpEzQZhjZ9WVHpURHDK1YlCvubVAMhDpnbqNHZ0AxlPletdoyugrH/OLKl5inhMXNj3Re7Hl8WsBWLUKp6sXFf0dvSFzqnr2jkhicS+K2IYZnjghC9cOBRO8fnkonh0EBt0evjUIKr5ClbCKioBX8JU+d4ldtWOpp2FlxeFTLreDJ5ZBU4//bQpTwYMt7gwMK+MO5WtokUx3UF98Z6GdUgbl6nBjBe82c7oIQXhHGHPnURQO7DDPgyVnNOnTPIkmiHJh/e3vkVhiZNHFCCLTip6GoJVrLxwb9i4q+d0thw4doxVJ5NB9OfDMV64/ybJgpf7m3Ld2yE0gsf1prrRlDFDXjlYyqqpf1l9Y0u3ctXo7UpXMgbyDEpUQhq3a7txZQO/17luTDoA6Tz1ADavvBwHkCAwEAAQ=="  # RSA-4096 DER base64 from classes3.dex
+HMAC_ACCESS_KEY = "ca5f8b2b6ef3487e9de345122190935a"  # from libenv.so (OLLVM-encrypted, EU/PROD)
+HMAC_SECRET_KEY = "woaghirrd8bcf0416d524691988df5fe7fc02362"  # from libenv.so (OLLVM-encrypted, EU/PROD)
+PASSWORD_PUBLIC_KEY = "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCBzg6+dwMVtGTNo8EPL+XFyz0OY0pMMo3HdRZGauuCSgISfVMkMmOhNEb2q9UfiQcEeOwVmOgts9VF4q0BJYrRNGQaPkLybwkWsx1JmbBRcr3qq+WWhqq8xQFksfn8KeXmwgVMFX+bzup43LE0vy0yyb+SuQ9FBBGuE1d/BfHHpQIDAQAB"  # RSA-1024 from v2.9.9 DEX
 PROD_SECRET = "890efe3207af95348b95f66b2ee7da04"  # from SignInterceptor (v2.9.9 PROD signing key)
 VIN_KEY = "a01a6db985a2f5d4"  # from libcrypto-util.so (AES key for VIN encryption)
 VIN_IV = "ed446b8b8845013d"  # from libcrypto-util.so (AES IV for VIN encryption)

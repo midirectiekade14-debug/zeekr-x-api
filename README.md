@@ -1,68 +1,141 @@
-# Zeekr X EV API
+# Zeekr EV Dashboard & API
 
-Unofficial Python API client and web dashboard for Zeekr electric vehicles. Monitor vehicle status, control charging, climate, locks, and more.
+Control and monitor your Zeekr electric vehicle from your browser. See battery level, range, location, charging status, lock/unlock doors, control climate, and much more.
 
-> **Tip:** Create a _separate Zeekr account_ and share the car with it. Otherwise the API will log you out of the phone app.
+![Dashboard](https://img.shields.io/badge/dashboard-web--based-blue) ![Python](https://img.shields.io/badge/python-3.10+-green) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
-## Features
+> **Important:** Create a _separate Zeekr account_ and share the car with it. Otherwise using this API will log you out of the official phone app.
 
-- **API Client** — Full vehicle control: status, charging, climate, locks, windows, trunk
-- **Dashboard** — Real-time web UI with vehicle status, charging monitor, trip history
-- **Configurator** — Visual car configurator with 3D model and color picker
-- **Widget** — Compact vehicle status widget for embedding
-- **Geofencing** — Create, toggle and manage geofences
-- **Sentry Mode** — View sentry events and camera snapshots
-- **Trip History** — Trip logs with GPS trackpoints, CSV export
-- **Scheduled Actions** — Climate pre-conditioning and charge scheduling
+---
 
-## Quick Start
+## What Can It Do?
 
-### 1. Clone
+- **Live Dashboard** — Battery %, range, location, charging status in your browser
+- **Vehicle Control** — Lock/unlock, windows, trunk, climate (start heating/cooling remotely)
+- **Charging Management** — Set charge limits, schedules, and travel plans
+- **Trip History** — View past trips with GPS routes, export to CSV
+- **Geofencing** — Get notified when your car enters/leaves an area
+- **Sentry Mode** — View security camera events and snapshots
+- **Car Configurator** — Visual 3D model with color picker (just for fun!)
 
+---
+
+## Installation (Step by Step)
+
+### What You Need
+
+- A computer (Windows, Mac, or Linux)
+- Python 3.10 or newer ([download here](https://www.python.org/downloads/))
+- An Android phone with the Zeekr app installed
+- A USB cable to connect your phone to your computer
+
+### Step 1: Download This Project
+
+Click the green **"Code"** button at the top of this page, then **"Download ZIP"**.
+Unzip the folder somewhere on your computer (e.g., your Desktop).
+
+Or if you know git:
 ```bash
 git clone https://github.com/midirectiekade14-debug/zeekr-x-api.git
 cd zeekr-x-api
 ```
 
-### 2. Install
+### Step 2: Install Python Dependencies
+
+Open a terminal/command prompt in the project folder and run:
 
 ```bash
-# API client only
-pip install .
-
-# With dashboard
 pip install ".[dashboard]"
 ```
 
-### 3. Configure
+### Step 3: Get Your Login Token
+
+The Zeekr API requires a login token from your phone. This sounds complicated, but we've made it easy with an included tool.
+
+#### Option A: Automatic Capture (Recommended)
+
+You need **ADB** (Android Debug Bridge) installed on your computer:
+- **Windows:** Download [Android Platform Tools](https://developer.android.com/tools/releases/platform-tools), unzip, and add to your PATH
+- **Mac:** `brew install android-platform-tools`
+- **Linux:** `sudo apt install adb`
+
+Then:
+
+1. **Enable USB Debugging** on your phone:
+   - Go to Settings → About Phone → tap "Build Number" 7 times
+   - Go back to Settings → Developer Options → enable "USB Debugging"
+
+2. **Connect your phone** via USB and allow the debugging prompt
+
+3. **Run the capture tool:**
+   ```bash
+   python tools/capture_token.py --email your-email@example.com
+   ```
+
+4. **Log in on your phone** when the app opens. The tool will capture your token automatically.
+
+5. A `session.json` file will be created — that's all the dashboard needs!
+
+#### Option B: Manual (Logcat Only)
+
+If you're already logged into the Zeekr app:
 
 ```bash
-cp .env.example .env
+python tools/capture_token.py --logcat-only
 ```
 
-Edit `.env` with your Zeekr credentials:
+This reads the existing app logs without restarting the app.
 
-```
-ZEEKR_EMAIL=your-email@example.com
-ZEEKR_PASSWORD=your-zeekr-password
-ZEEKR_COUNTRY=NL
-```
-
-### 4. Run Dashboard
+### Step 4: Start the Dashboard
 
 ```bash
 python dashboard.py
 ```
 
-Open http://localhost:3941 in your browser. You can change the port with `ZEEKR_PORT=8080`.
+Open **http://localhost:3941** in your browser. Done! 🎉
 
-## API Usage
+You can change the port: `ZEEKR_PORT=8080 python dashboard.py`
+
+---
+
+## How Authentication Works
+
+### EU Users
+The European Zeekr app (`com.zeekr.overseas`) uses a direct Bearer token login via `eu-snc-tsp-api-gw.zeekrlife.com`. No HMAC signing is needed for pre-login. The `capture_token.py` tool handles this automatically.
+
+### SEA / Middle East / Latin America Users
+These regions use HMAC-signed requests for the initial authentication. The required signing keys are already included in `src/zeekr_ev_api/const.py` (extracted from the APK — they're the same for all users).
+
+If Zeekr releases a new app version and the keys stop working, you can extract new ones:
+
+```bash
+# Get the latest APK from your phone or apkmirror.com
+python tools/extract_keys.py path/to/zeekr.apk
+```
+
+Or use [Wysie's zeekr_key_extractor](https://github.com/Wysie/zeekr_key_extractor) for advanced extraction from `libenv.so`.
+
+---
+
+## Token Refresh
+
+Your Bearer token is valid for about **7 days**. The refresh token lasts **30 days**.
+
+When the token expires, simply run `capture_token.py` again, or the dashboard will prompt you to re-authenticate.
+
+---
+
+## API Usage (For Developers)
 
 ```python
 from zeekr_ev_api.client import ZeekrClient
 
-client = ZeekrClient(email="you@example.com", password="secret", country="NL")
-client.login()
+# Load from session.json
+import json
+with open("session.json") as f:
+    session = json.load(f)
+
+client = ZeekrClient(session_data=session)
 
 # Get vehicle status
 status = client.get_vehicle_status()
@@ -78,78 +151,62 @@ client.start_climate(temperature=21)
 
 ## CLI Tools
 
-| Script | Description |
+| Script | What It Does |
 |--------|-------------|
-| `zeekr_status.py` | Detailed vehicle status report |
+| `zeekr_status.py` | Shows detailed vehicle status |
 | `zeekr_control.py` | Lock/unlock, windows, trunk, climate |
 | `zeekr_trips.py` | Trip history and statistics |
 | `zeekr_fence.py` | Geofence management |
 | `zeekr_plans.py` | Charging schedule management |
-| `verify_sig.py` | API signature verification tool |
 
-## Dashboard Endpoints
+## Dashboard API Endpoints
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /` | Main dashboard |
-| `GET /widget` | Compact status widget |
+| URL | What It Returns |
+|-----|----------------|
+| `GET /` | Main dashboard page |
+| `GET /widget` | Compact status widget (for embedding) |
 | `GET /configurator` | Visual car configurator |
-| `GET /api/vehicles` | List vehicles |
+| `GET /api/vehicles` | List of your vehicles |
+| `GET /api/status` | Current vehicle status |
 | `GET /api/trips` | Trip history |
-| `GET /api/trips/csv` | Export trips as CSV |
-| `GET /api/fences` | List geofences |
+| `GET /api/trips/csv` | Export trips as CSV file |
+| `GET /api/fences` | Your geofences |
 | `GET /api/sentry/events` | Sentry mode events |
 | `GET /api/charge-plan` | Charging schedule |
-| `GET /api/schedules` | All scheduled actions |
 
-## API Keys
+---
 
-All required signing keys (HMAC, RSA, AES) are **included** in `src/zeekr_ev_api/const.py`. You don't need to extract anything to get started — just add your email and password.
+## Included Signing Keys
 
-### Updating keys after a Zeekr app update
+All API signing keys (HMAC, RSA, AES) are **included** in `src/zeekr_ev_api/const.py`. These are app-level keys extracted from the public APK — they are the same for every user and are **not** personal credentials.
 
-When Zeekr releases a new app version, the signing keys may change. Use the included extraction tool to get the new keys:
-
-```bash
-# Download the latest Zeekr APK from your phone or APKMirror
-# Then run:
-python tools/extract_keys.py path/to/zeekr.apk
-```
-
-The tool scans the APK's DEX files and native libraries (`.so`) for:
-
-| Key | Location in APK | Used for |
-|-----|----------------|----------|
-| HMAC Access Key | `libHttpSecretKey.so` | Pre-login API authentication |
-| HMAC Secret Key | `libAppSecret.so` | Pre-login request signing |
-| RSA Public Key | DEX (`classes*.dex`) | Password encryption (OAEP) |
-| PROD Signing Key | DEX (`SignInterceptor`) | Post-login X-SIGNATURE header |
+| Key | Source | Purpose |
+|-----|--------|---------|
+| HMAC Access Key | `libenv.so` (OLLVM-encrypted) | API gateway authentication (SEA/EM) |
+| HMAC Secret Key | `libenv.so` (OLLVM-encrypted) | Request signing (SEA/EM) |
+| RSA Public Key | DEX bytecode | Password encryption |
+| PROD Signing Key | `SignInterceptor` class | Post-login X-SIGNATURE header |
 | VIN AES Key + IV | `libcrypto-util.so` | Vehicle ID encryption |
 
-The tool outputs the values in copy-paste format for `const.py`.
+---
 
-### How to get the APK
+## Security
 
-1. **From your phone:** Use [APK Extractor](https://play.google.com/store/apps/details?id=com.ext.ui) or `adb pull`
-2. **From APKMirror:** Search for "Zeekr" on [apkmirror.com](https://www.apkmirror.com/)
-3. **XAPK format** is also supported — the tool handles nested APKs automatically
-
-## Security Notes
-
-- **Never commit your `.env` file** — it contains your credentials
-- The dashboard uses session-based auth with rate limiting
-- The signing keys in `const.py` are app-level (same for all users, extracted from the public APK) — they are not personal credentials
+- **Never share your `session.json`** — it contains your personal login tokens
+- **Never commit `.env` or `session.json`** to git (both are in `.gitignore`)
+- The dashboard uses session cookies with rate limiting
 
 ## Requirements
 
 - Python 3.10+
-- `pycryptodome` (encryption)
-- `requests` (HTTP)
-- `fastapi` + `uvicorn` + `python-dotenv` (dashboard, optional)
+- Android phone with Zeekr app (for token capture)
+- ADB (Android Debug Bridge) for the capture tool
 
 ## Credits
 
-Based on [Fryyyyy/zeekr_ev_api](https://github.com/Fryyyyy/zeekr_ev_api). Extended with dashboard, vehicle control tools, trip tracking, geofencing, sentry mode, and scheduled actions.
+Based on [Fryyyyy/zeekr_ev_api](https://github.com/Fryyyyy/zeekr_ev_api). Extended with dashboard, vehicle control, trip tracking, geofencing, sentry mode, scheduled actions, EU authentication support, and ADB token capture tool.
+
+Key extraction powered by [Wysie/zeekr_key_extractor](https://github.com/Wysie/zeekr_key_extractor).
 
 ## License
 
