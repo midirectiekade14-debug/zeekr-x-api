@@ -102,11 +102,43 @@ client.start_climate(temperature=21)
 | `GET /api/charge-plan` | Charging schedule |
 | `GET /api/schedules` | All scheduled actions |
 
+## API Keys
+
+All required signing keys (HMAC, RSA, AES) are **included** in `src/zeekr_ev_api/const.py`. You don't need to extract anything to get started — just add your email and password.
+
+### Updating keys after a Zeekr app update
+
+When Zeekr releases a new app version, the signing keys may change. Use the included extraction tool to get the new keys:
+
+```bash
+# Download the latest Zeekr APK from your phone or APKMirror
+# Then run:
+python tools/extract_keys.py path/to/zeekr.apk
+```
+
+The tool scans the APK's DEX files and native libraries (`.so`) for:
+
+| Key | Location in APK | Used for |
+|-----|----------------|----------|
+| HMAC Access Key | `libHttpSecretKey.so` | Pre-login API authentication |
+| HMAC Secret Key | `libAppSecret.so` | Pre-login request signing |
+| RSA Public Key | DEX (`classes*.dex`) | Password encryption (OAEP) |
+| PROD Signing Key | DEX (`SignInterceptor`) | Post-login X-SIGNATURE header |
+| VIN AES Key + IV | `libcrypto-util.so` | Vehicle ID encryption |
+
+The tool outputs the values in copy-paste format for `const.py`.
+
+### How to get the APK
+
+1. **From your phone:** Use [APK Extractor](https://play.google.com/store/apps/details?id=com.ext.ui) or `adb pull`
+2. **From APKMirror:** Search for "Zeekr" on [apkmirror.com](https://www.apkmirror.com/)
+3. **XAPK format** is also supported — the tool handles nested APKs automatically
+
 ## Security Notes
 
 - **Never commit your `.env` file** — it contains your credentials
 - The dashboard uses session-based auth with rate limiting
-- API keys (HMAC, RSA, AES) must be extracted from the Zeekr APK — they are not included in this repo
+- The signing keys in `const.py` are app-level (same for all users, extracted from the public APK) — they are not personal credentials
 
 ## Requirements
 
