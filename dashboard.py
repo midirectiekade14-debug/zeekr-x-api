@@ -772,9 +772,11 @@ HTML = """<!DOCTYPE html>
   .updated { font-size: 0.7rem; color: #475569; margin-top: 0.5rem; }
   .error-card { border-color: #ef4444 !important; }
   .error-card .value { font-size: 1rem; color: #ef4444; }
-  .card-map { padding: 0; overflow: hidden; }
+  .card-map { padding: 0; overflow: hidden; cursor: pointer; }
+  .card-map.expanded { grid-column: 1 / -1; }
+  .card-map.expanded #map { height: 500px; }
   .card-map .label { padding: 1.5rem 1.5rem 0.75rem; }
-  #map { height: 260px; }
+  #map { height: 260px; transition: height 0.3s ease; touch-action: none; }
   .loc-info { padding: 0.5rem 1.5rem 1rem; font-size: 0.72rem; color: #64748b; }
 
   /* Controls */
@@ -1320,6 +1322,31 @@ async function togglePreheat(on) {
 <script>
 let map = null;
 let marker = null;
+
+// Expand/collapse map card — only on label click, not on map drag
+(function() {
+  const card = document.getElementById('card-location');
+  const label = card.querySelector('.label');
+  const locInfo = card.querySelector('.loc-info');
+
+  // Only toggle when clicking the label or loc-info, NOT the map itself
+  function toggleMap(e) {
+    card.classList.toggle('expanded');
+    if (map) {
+      setTimeout(() => map.invalidateSize(), 350);
+    }
+  }
+  label.style.cursor = 'pointer';
+  locInfo.style.cursor = 'pointer';
+  label.addEventListener('click', toggleMap);
+  locInfo.addEventListener('click', toggleMap);
+
+  // Prevent map interactions from bubbling to card
+  const mapEl = document.getElementById('map');
+  mapEl.addEventListener('mousedown', e => e.stopPropagation());
+  mapEl.addEventListener('touchstart', e => e.stopPropagation(), {passive: true});
+  card.style.cursor = 'default';
+})();
 
 async function loadLocation() {
   try {
