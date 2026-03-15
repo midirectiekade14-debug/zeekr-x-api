@@ -106,6 +106,53 @@ def _sf(val, default=None):
         return default
 
 
+# ── GCJ-02 → WGS-84 Coordinate Conversion ────────────────────────────────────
+# Zeekr's Chinese backend returns GCJ-02 ("Mars") coordinates.
+# OpenStreetMap uses WGS-84. Without conversion, the car shows ~300m off.
+import math
+
+_GCJ_A = 6378245.0
+_GCJ_EE = 0.00669342162296594
+
+
+def _gcj_out_of_china(lat, lon):
+    return not (73.66 < lon < 136.05 and 3.86 < lat < 53.55)
+
+
+def _gcj_transform_lat(x, y):
+    ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * math.sqrt(abs(x))
+    ret += (20.0 * math.sin(6.0 * x * math.pi) + 20.0 * math.sin(2.0 * x * math.pi)) * 2.0 / 3.0
+    ret += (20.0 * math.sin(y * math.pi) + 40.0 * math.sin(y / 3.0 * math.pi)) * 2.0 / 3.0
+    ret += (160.0 * math.sin(y / 12.0 * math.pi) + 320.0 * math.sin(y * math.pi / 30.0)) * 2.0 / 3.0
+    return ret
+
+
+def _gcj_transform_lon(x, y):
+    ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * math.sqrt(abs(x))
+    ret += (20.0 * math.sin(6.0 * x * math.pi) + 20.0 * math.sin(2.0 * x * math.pi)) * 2.0 / 3.0
+    ret += (20.0 * math.sin(x * math.pi) + 40.0 * math.sin(x / 3.0 * math.pi)) * 2.0 / 3.0
+    ret += (150.0 * math.sin(x / 12.0 * math.pi) + 300.0 * math.sin(x / 30.0 * math.pi)) * 2.0 / 3.0
+    return ret
+
+
+def gcj02_to_wgs84(lat, lon):
+    """Convert GCJ-02 coordinates to WGS-84."""
+    if lat is None or lon is None:
+        return lat, lon
+    lat, lon = float(lat), float(lon)
+    if _gcj_out_of_china(lat, lon):
+        return lat, lon  # Outside China: likely already WGS-84
+    d_lat = _gcj_transform_lat(lon - 105.0, lat - 35.0)
+    d_lon = _gcj_transform_lon(lon - 105.0, lat - 35.0)
+    rad_lat = lat / 180.0 * math.pi
+    magic = math.sin(rad_lat)
+    magic = 1 - _GCJ_EE * magic * magic
+    sqrt_magic = math.sqrt(magic)
+    d_lat = (d_lat * 180.0) / ((_GCJ_A * (1 - _GCJ_EE)) / (magic * sqrt_magic) * math.pi)
+    d_lon = (d_lon * 180.0) / (_GCJ_A / sqrt_magic * math.cos(rad_lat) * math.pi)
+    return lat - d_lat, lon - d_lon
+
+
 def _si(val, default=None):
     """Safe int."""
     f = _sf(val)
@@ -222,7 +269,7 @@ def normalize_status(status: dict, charging: dict, vehicle, rc_state: dict = Non
         "tyres": tyres,
         "battery_12v": _sf(main_batt.get("voltage")) if main_batt else None,
         "pm25_interior": _si(poll.get("interiorPM25Level")),
-        "location": {"lat": _sf(pos.get("latitude")), "lon": _sf(pos.get("longitude"))} if pos.get("latitude") else None,
+        "location": (lambda la, lo: {"lat": la, "lon": lo})(*gcj02_to_wgs84(_sf(pos.get("latitude")), _sf(pos.get("longitude")))) if pos.get("latitude") else None,
         "vehicle_photo": vehicle.data.get("vehiclePhotoBig") or vehicle.data.get("vehiclePhotoSmall"),
         "color_name": vehicle.data.get("colorName"),
         "color_code": vehicle.data.get("colorCode"),
@@ -511,46 +558,66 @@ def fetch_location_data(sess: Dict[str, Any]) -> Dict[str, Any]:
     v = _get_active_vehicle(sess)
     if not v:
         return {"error": "Geen voertuigen gevonden"}
-    try:
-        journal = v.get_journey_log(page_size=5, current_page=1)
-    except Exception as e:
-        return {"error": str(e)}
 
-    trips = None
-    for key in ("data", "records", "list", "rows", "result", "items"):
-        if isinstance(journal, dict) and key in journal:
-            val = journal[key]
-            if isinstance(val, list) and val:
-                trips = val
-                break
-    if trips is None and isinstance(journal, list) and journal:
-        trips = journal
+    lat, lon, ts, source = None, None, None, None
 
-    if not trips:
-        return {"error": "Geen trips gevonden", "raw": journal}
+    # Source 1: Real-time vehicle status position (most accurate)
+    cached = sess.get("cached_data")
+    if cached and isinstance(cached, dict):
+        parsed = cached.get("parsed", {})
+        loc = parsed.get("location")
+        if loc and loc.get("lat") and loc.get("lon"):
+            lat, lon = loc["lat"], loc["lon"]
+            ts = cached.get("timestamp") or parsed.get("timestamp")
+            source = "live"
 
-    trip = trips[0]
+    # Source 2: Journey log (fallback — end of last trip)
+    if lat is None or lon is None:
+        try:
+            journal = v.get_journey_log(page_size=5, current_page=1)
+        except Exception as e:
+            if lat is None:
+                return {"error": str(e)}
+            journal = None
 
-    lat = trip.get("endLatitude") or trip.get("endLat")
-    lon = trip.get("endLongitude") or trip.get("endLon")
+        if journal:
+            trips = None
+            for key in ("data", "records", "list", "rows", "result", "items"):
+                if isinstance(journal, dict) and key in journal:
+                    val = journal[key]
+                    if isinstance(val, list) and val:
+                        trips = val
+                        break
+            if trips is None and isinstance(journal, list) and journal:
+                trips = journal
 
-    # Fallback: extract from trackPoints (last point = end position)
-    if (lat is None or lon is None) and "trackPoints" in trip:
-        tp = trip["trackPoints"]
-        if isinstance(tp, list) and tp:
-            last = tp[-1]
-            if lat is None and "latitude" in last:
-                lat = last["latitude"]
-            if lon is None and "longitude" in last:
-                lon = last["longitude"]
+            if trips:
+                trip = trips[0]
+                lat = trip.get("endLatitude") or trip.get("endLat")
+                lon = trip.get("endLongitude") or trip.get("endLon")
 
-    ts = None
-    for ts_key in ("endTime", "end_time", "tripEndTime", "timestamp", "createTime"):
-        if ts_key in trip:
-            ts = trip[ts_key]
-            break
+                if (lat is None or lon is None) and "trackPoints" in trip:
+                    tp = trip["trackPoints"]
+                    if isinstance(tp, list) and tp:
+                        last = tp[-1]
+                        if lat is None and "latitude" in last:
+                            lat = last["latitude"]
+                        if lon is None and "longitude" in last:
+                            lon = last["longitude"]
 
-    result = {"lat": lat, "lon": lon, "timestamp": ts, "raw_trip": trip}
+                for ts_key in ("endTime", "end_time", "tripEndTime", "timestamp", "createTime"):
+                    if ts_key in trip:
+                        ts = trip[ts_key]
+                        break
+                source = "trip"
+
+    if lat is None or lon is None:
+        return {"error": "Geen locatiedata beschikbaar"}
+
+    # Convert GCJ-02 → WGS-84 (Zeekr backend uses Chinese coordinate system)
+    lat, lon = gcj02_to_wgs84(lat, lon)
+
+    result = {"lat": lat, "lon": lon, "timestamp": ts, "source": source}
     sess["cached_location"] = result
     return result
 
@@ -1277,8 +1344,9 @@ async function loadLocation() {
         const ms = d.timestamp > 1e12 ? d.timestamp : d.timestamp * 1000;
         tsLabel = new Date(ms).toLocaleString('nl-NL');
       }
+      const srcLabel = d.source === 'live' ? 'Live positie' : 'Laatste rit';
       document.getElementById('loc-info').textContent =
-        `${lat.toFixed(5)}, ${lon.toFixed(5)} — Rit beëindigd: ${tsLabel}`;
+        `${lat.toFixed(5)}, ${lon.toFixed(5)} — ${srcLabel}: ${tsLabel}`;
     } else {
       document.getElementById('loc-info').textContent =
         d.error || 'Geen locatiedata beschikbaar in trip history';
