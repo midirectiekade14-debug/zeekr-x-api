@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZEEKR X — 3D Configurator</title>
+<style>
+  @font-face { font-family: 'ZeekrHeadline'; src: url('/static/ZeekrHeadline-Regular.woff2') format('woff2'); font-weight: 400; }
+  @font-face { font-family: 'ZeekrText'; src: url('/static/ZeekrText-Regular.woff2') format('woff2'); font-weight: 400; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'ZeekrText', -apple-system, 'Segoe UI', sans-serif;
+    background: #0a0a0a;
+    color: #fff;
+    overflow: hidden;
+    height: 100vh; width: 100vw;
+  }
+
+  #canvas-container {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  /* Top bar */
+  .top-bar {
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 10;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 20px 32px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
+  }
+  .logo {
+    font-family: 'ZeekrHeadline', sans-serif;
+    font-size: 22px; letter-spacing: 2px;
+    color: #fff;
+  }
+  .back-btn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff; border-radius: 8px;
+    padding: 8px 16px; cursor: pointer;
+    font-size: 13px; font-family: inherit;
+    backdrop-filter: blur(8px);
+    transition: all 0.2s;
+  }
+  .back-btn:hover { background: rgba(255,255,255,0.2); }
+
+  /* Bottom panel */
+  .config-panel {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    z-index: 10;
+    background: linear-gradient(to top, rgba(0,0,0,0.85) 60%, transparent);
+    padding: 40px 32px 32px;
+  }
+
+  .model-name {
+    font-family: 'ZeekrHeadline', sans-serif;
+    font-size: 28px; letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+  .model-sub {
+    font-size: 13px; color: rgba(255,255,255,0.5);
+    margin-bottom: 20px;
+  }
+
+  /* Color selector */
+  .section-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 12px;
+  }
+
+  /* Wheel selector */
+  .wheel-row {
+    display: flex; gap: 10px; margin-bottom: 20px;
+  }
+  .wheel-opt {
+    width: 56px; height: 56px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.08);
+    border: 2px solid transparent;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; color: rgba(255,255,255,0.5);
+    transition: all 0.2s;
+  }
+  .wheel-opt.active {
+    border-color: #ED8733;
+    background: rgba(237,135,51,0.1);
+    color: #fff;
+  }
+  .wheel-opt:hover { background: rgba(255,255,255,0.12); }
+
+  /* Camera buttons */
+  .cam-row {
+    display: flex; gap: 8px; margin-top: 12px;
+  }
+  .cam-btn {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.7);
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 12px; font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .cam-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+  .cam-btn.active { background: rgba(237,135,51,0.15); border-color: #ED8733; color: #ED8733; }
+
+  /* Loading */
+  #loader {
+    position: fixed; inset: 0;
+    z-index: 100;
+    background: #0a0a0a;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    transition: opacity 0.5s;
+  }
+  #loader.hide { opacity: 0; pointer-events: none; }
+  .loader-text {
+    font-family: 'ZeekrHeadline', sans-serif;
+    font-size: 24px; letter-spacing: 3px;
+    margin-bottom: 20px;
+  }
+  .loader-bar {
+    width: 200px; height: 2px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+  .loader-fill {
+    height: 100%;
+    background: #ED8733;
+    width: 0%;
+    transition: width 0.3s;
+  }
+  .loader-pct {
+    font-size: 12px;
+    color: rgba(255,255,255,0.4);
+    margin-top: 8px;
+  }
+
+  /* Auto-rotate indicator */
+  .auto-rotate-btn {
+    position: fixed; top: 20px; right: 140px;
+    z-index: 10;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.5);
+    border-radius: 50%;
+    width: 40px; height: 40px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    transition: all 0.2s;
+  }
+  .auto-rotate-btn.active { color: #ED8733; border-color: #ED8733; }
+
+  .color-row {
+    display: flex; gap: 8px; margin-bottom: 20px;
+  }
+  .color-thumb {
+    width: 64px; height: 48px;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    overflow: hidden;
+    background: rgba(255,255,255,0.05);
+  }
+  .color-thumb img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+  .color-thumb:hover { transform: scale(1.1); border-color: rgba(255,255,255,0.3); }
+  .color-thumb.active { border-color: #ED8733; box-shadow: 0 0 0 2px rgba(237,135,51,0.4); }
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="loader-text">ZEEKR</div>
+  <div class="loader-bar"><div class="loader-fill" id="loader-fill"></div></div>
+  <div class="loader-pct" id="loader-pct">Laden...</div>
+</div>
+
+<div class="top-bar">
+  <div class="logo">ZEEKR X</div>
+  <button class="back-btn" onclick="location.href='/widget'">← Terug</button>
+</div>
+
+<button class="auto-rotate-btn active" id="rotateBtn" title="Auto-rotatie">↻</button>
+
+<div id="canvas-container"></div>
+
+<div class="config-panel">
+  <div class="model-name">ZEEKR X</div>
+  <div class="model-sub">Privilege AWD · 66 kWh</div>
+
+  <div class="section-label">Exterieur kleur</div>
+  <div class="color-row" id="colorRow"></div>
+
+  <div class="section-label">Camera</div>
+  <div class="cam-row">
+    <button class="cam-btn active" data-cam="exterior">Exterieur</button>
+    <button class="cam-btn" data-cam="front">Voorkant</button>
+    <button class="cam-btn" data-cam="rear">Achterkant</button>
+    <button class="cam-btn" data-cam="side">Zijkant</button>
+    <button class="cam-btn" data-cam="top">Bovenaanzicht</button>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.171.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// === COLOR CONFIG ===
+const COLORS = [
+  { name: 'Crystal White', hex: '#F5F5F0', metal: 0.3, rough: 0.35, img: '/static/color_crystal_white.png' },
+  { name: 'Onyx Black',    hex: '#1a1a1a', metal: 0.4, rough: 0.25, img: '/static/color_onyx_black.png' },
+  { name: 'Pine Green',    hex: '#2D4A3E', metal: 0.35, rough: 0.3, img: '/static/color_pine_green.png' },
+  { name: 'Palace Beige',  hex: '#C8B99A', metal: 0.25, rough: 0.4, img: '/static/color_palace_beige.png' },
+  { name: 'Grid Grey',     hex: '#6B6E70', metal: 0.4, rough: 0.3, img: '/static/color_grid_grey.png' },
+  { name: 'Mist Grey',     hex: '#C4C8CE', metal: 0.3, rough: 0.35, img: '/static/color_mist_grey.png' },
+];
+
+// === MESH CLASSIFICATION (all 48 meshes from GLB) ===
+// Body panels — recolorable with selected exterior color
+const BODY_NAMES = new Set([
+  'body_L', 'body_C', 'Trunk_B', 'Trunk_F',
+  'Door_LB', 'Door_LF',
+  'Z_Door_LB_', 'Z_ZDoor_LF_', 'Z_Dr_LF', 'Z_Dr_RF',
+  'DoorKnob_LB', 'DoorKnob_LF',
+  'RearviewMirrors_LF', 'RearviewMirrors_dw',
+  'Charger', 'bkad',
+]);
+// Glass — transparent, tinted
+const GLASS_NAMES = new Set([
+  'body_L_GLASS', 'body_C_GLASS', 'DoorGlass_LF', 'DoorGlass_LB',
+  'Trunk_B_Glass',
+]);
+// Tire rubber
+const TIRE_NAMES = new Set([
+  'tire_01', 'tire_02', 'tire_03',
+]);
+// Wheel rims (metallic alloy)
+const WHEEL_NAMES = new Set([
+  'tire_01_ke', 'tire_02_ke', 'tire_03_ke',
+  'geo1', 'hub_19_logo', 'ke',
+]);
+// Brake calipers
+const CALIPER_NAMES = new Set([
+  'WheelCaliper_01', 'WheelCaliper_02',
+]);
+// Lights — front and rear light units
+const LIGHT_NAMES = new Set([
+  'laga_f1', 'laga_f2', 'laga_f3',   // front lights
+  'lagan_b', 'lagan_b002',             // rear lights
+  'lagan_f', 'langan_b003',            // light bars
+  'LINES_HEAD',                         // headlight LED lines
+  'Elec',                               // light detail
+]);
+// Dark trim (black plastic/rubber)
+const TRIM_NAMES = new Set([
+  'Charger_in', 'SD', 'Shape001', 'Cylinder001',
+]);
+// Interior (visible through glass)
+const INTERIOR_NAMES = new Set([
+  'seat_bk',
+]);
+// Mirror glass (highly reflective)
+const MIRROR_NAMES = new Set([
+  'mirr',
+]);
+// Hide — scene artifacts not part of the car
+const HIDE_NAMES = new Set([
+  'Sphere',
+]);
+// Parts that exist only on left side → need X-axis mirror for right side
+const MIRROR_PARTS = new Set([
+  'body_L', 'Door_LB', 'Door_LF',
+  'Z_Door_LB_', 'Z_ZDoor_LF_',
+  'DoorKnob_LB', 'DoorKnob_LF',
+  'DoorGlass_LB', 'DoorGlass_LF',
+  'RearviewMirrors_LF', 'RearviewMirrors_dw',
+  'body_L_GLASS',
+]);
+
+// === SCENE SETUP ===
+const container = document.getElementById('canvas-container');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+container.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+
+// Gradient background
+const bgCanvas = document.createElement('canvas');
+bgCanvas.width = 2; bgCanvas.height = 512;
+const bgCtx = bgCanvas.getContext('2d');
+const grad = bgCtx.createLinearGradient(0, 0, 0, 512);
+grad.addColorStop(0, '#1a1a2e');
+grad.addColorStop(0.5, '#16162a');
+grad.addColorStop(1, '#0d0d1a');
+bgCtx.fillStyle = grad;
+bgCtx.fillRect(0, 0, 2, 512);
+const bgTex = new THREE.CanvasTexture(bgCanvas);
+scene.background = bgTex;
+
+// Environment map (simple studio)
+const pmremGen = new THREE.PMREMGenerator(renderer);
+const envScene = new THREE.Scene();
+const envLight1 = new THREE.Mesh(
+  new THREE.PlaneGeometry(20, 20),
+  new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide })
+);
+envLight1.position.set(0, 8, 0);
+envLight1.lookAt(0, 0, 0);
+envScene.add(envLight1);
+
+const envLight2 = new THREE.Mesh(
+  new THREE.PlaneGeometry(15, 15),
+  new THREE.MeshBasicMaterial({ color: 0x8888aa, side: THREE.DoubleSide })
+);
+envLight2.position.set(5, 3, -8);
+envLight2.lookAt(0, 0, 0);
+envScene.add(envLight2);
+
+const envLight3 = new THREE.Mesh(
+  new THREE.PlaneGeometry(10, 10),
+  new THREE.MeshBasicMaterial({ color: 0xaaaacc, side: THREE.DoubleSide })
+);
+envLight3.position.set(-5, 2, 8);
+envLight3.lookAt(0, 0, 0);
+envScene.add(envLight3);
+
+const envMap = pmremGen.fromScene(envScene, 0.04).texture;
+scene.environment = envMap;
+
+// Lights
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+scene.add(ambientLight);
+
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.5);
+keyLight.position.set(5, 8, 5);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.camera.near = 0.1;
+keyLight.shadow.camera.far = 30;
+keyLight.shadow.camera.left = -8;
+keyLight.shadow.camera.right = 8;
+keyLight.shadow.camera.top = 8;
+keyLight.shadow.camera.bottom = -8;
+scene.add(keyLight);
+
+const fillLight = new THREE.DirectionalLight(0x8888cc, 0.6);
+fillLight.position.set(-5, 4, -3);
+scene.add(fillLight);
+
+const rimLight = new THREE.DirectionalLight(0xffaa44, 0.4);
+rimLight.position.set(0, 2, -8);
+scene.add(rimLight);
+
+// Ground plane
+const groundGeo = new THREE.CircleGeometry(15, 64);
+const groundMat = new THREE.MeshStandardMaterial({
+  color: 0x111118,
+  metalness: 0.8,
+  roughness: 0.6,
+});
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.01;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Camera
+const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(6, 3, 8);
+
+// Controls
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.minDistance = 4;
+controls.maxDistance = 20;
+controls.maxPolarAngle = Math.PI / 2.1;
+controls.target.set(0, 0.8, 0);
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.8;
+controls.update();
+
+// === SHARED MATERIALS (created once, reused) ===
+const matBody = new THREE.MeshPhysicalMaterial({
+  color: new THREE.Color(COLORS[0].hex),
+  metalness: COLORS[0].metal,
+  roughness: COLORS[0].rough,
+  clearcoat: 0.8,
+  clearcoatRoughness: 0.15,
+  envMapIntensity: 1.2,
+});
+const matGlass = new THREE.MeshPhysicalMaterial({
+  color: 0x111122,
+  metalness: 0.1,
+  roughness: 0.05,
+  transmission: 0.7,
+  thickness: 0.5,
+  opacity: 0.75,
+  transparent: true,
+  envMapIntensity: 1.5,
+  side: THREE.DoubleSide,
+});
+const matTire = new THREE.MeshStandardMaterial({
+  color: 0x1a1a1a,
+  metalness: 0.0,
+  roughness: 0.9,
+});
+const matWheel = new THREE.MeshStandardMaterial({
+  color: 0x888888,
+  metalness: 0.85,
+  roughness: 0.2,
+});
+const matCaliper = new THREE.MeshStandardMaterial({
+  color: 0x333333,
+  metalness: 0.7,
+  roughness: 0.3,
+});
+const matLight = new THREE.MeshPhysicalMaterial({
+  color: 0xeeeeff,
+  metalness: 0.1,
+  roughness: 0.1,
+  emissive: 0x444455,
+  emissiveIntensity: 0.4,
+  clearcoat: 1.0,
+  clearcoatRoughness: 0.05,
+  envMapIntensity: 2.0,
+});
+const matTrim = new THREE.MeshStandardMaterial({
+  color: 0x111111,
+  metalness: 0.2,
+  roughness: 0.7,
+});
+const matInterior = new THREE.MeshStandardMaterial({
+  color: 0x1a1a1a,
+  metalness: 0.1,
+  roughness: 0.8,
+});
+const matMirror = new THREE.MeshPhysicalMaterial({
+  color: 0xccccdd,
+  metalness: 1.0,
+  roughness: 0.05,
+  envMapIntensity: 2.5,
+});
+const matDefault = new THREE.MeshStandardMaterial({
+  color: 0x1a1a1a,
+  metalness: 0.3,
+  roughness: 0.5,
+});
+
+// === LOAD MODEL ===
+const loader = new GLTFLoader();
+let carModel = null;
+const bodyMeshes = [];
+
+function classifyMesh(name) {
+  if (HIDE_NAMES.has(name)) return 'hide';
+  if (BODY_NAMES.has(name)) return 'body';
+  if (GLASS_NAMES.has(name)) return 'glass';
+  if (TIRE_NAMES.has(name)) return 'tire';
+  if (WHEEL_NAMES.has(name)) return 'wheel';
+  if (CALIPER_NAMES.has(name)) return 'caliper';
+  if (LIGHT_NAMES.has(name)) return 'light';
+  if (TRIM_NAMES.has(name)) return 'trim';
+  if (INTERIOR_NAMES.has(name)) return 'interior';
+  if (MIRROR_NAMES.has(name)) return 'mirror';
+  return 'default';
+}
+
+function getMaterial(type) {
+  switch (type) {
+    case 'body':     return matBody.clone();
+    case 'glass':    return matGlass;
+    case 'tire':     return matTire;
+    case 'wheel':    return matWheel;
+    case 'caliper':  return matCaliper;
+    case 'light':    return matLight;
+    case 'trim':     return matTrim;
+    case 'interior': return matInterior;
+    case 'mirror':   return matMirror;
+    default:         return matDefault;
+  }
+}
+
+loader.load('/static/zeekr_x.glb', (gltf) => {
+  carModel = gltf.scene;
+
+  // Center and scale
+  const box = new THREE.Box3().setFromObject(carModel);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const scale = 4 / maxDim;
+  carModel.scale.setScalar(scale);
+  carModel.position.sub(center.multiplyScalar(scale));
+  carModel.position.y = 0;
+
+  // Recalc bounding after scale
+  const box2 = new THREE.Box3().setFromObject(carModel);
+  carModel.position.y -= box2.min.y;
+
+  // Collect meshes that need mirroring
+  const toMirror = [];
+
+  // Process all meshes
+  carModel.traverse((child) => {
+    if (!child.isMesh) return;
+    child.castShadow = true;
+    child.receiveShadow = true;
+
+    const name = child.name || '';
+    const type = classifyMesh(name);
+
+    if (type === 'hide') {
+      child.visible = false;
+      return;
+    }
+
+    child.material = getMaterial(type);
+    if (type === 'body') bodyMeshes.push(child);
+
+    // Mark left-only parts for mirroring
+    if (MIRROR_PARTS.has(name)) {
+      toMirror.push({ mesh: child, type });
+    }
+  });
+
+  // Mirror left-side parts to create right side
+  toMirror.forEach(({ mesh, type }) => {
+    const mirrored = mesh.clone();
+    mirrored.name = mesh.name + '_R';
+    // Mirror on X axis
+    mirrored.applyMatrix4(new THREE.Matrix4().makeScale(-1, 1, 1));
+    // Flip normals for correct lighting on mirrored geometry
+    if (mirrored.geometry) {
+      mirrored.geometry = mirrored.geometry.clone();
+      const normal = mirrored.geometry.getAttribute('normal');
+      if (normal) {
+        for (let i = 0; i < normal.count; i++) {
+          normal.setX(i, -normal.getX(i));
+        }
+        normal.needsUpdate = true;
+      }
+      // Flip winding order
+      const index = mirrored.geometry.getIndex();
+      if (index) {
+        const arr = index.array;
+        for (let i = 0; i < arr.length; i += 3) {
+          const tmp = arr[i + 1];
+          arr[i + 1] = arr[i + 2];
+          arr[i + 2] = tmp;
+        }
+        index.needsUpdate = true;
+      }
+    }
+    mirrored.material = mesh.material;
+    if (type === 'body') bodyMeshes.push(mirrored);
+    mesh.parent.add(mirrored);
+  });
+
+  scene.add(carModel);
+  controls.target.set(0, 0.8, 0);
+  controls.update();
+
+  // Hide loader
+  document.getElementById('loader').classList.add('hide');
+  setTimeout(() => document.getElementById('loader').style.display = 'none', 600);
+
+}, (progress) => {
+  if (progress.total) {
+    const pct = Math.round((progress.loaded / progress.total) * 100);
+    document.getElementById('loader-fill').style.width = pct + '%';
+    document.getElementById('loader-pct').textContent = pct + '%';
+  }
+});
+
+
+// === COLOR PICKER ===
+const colorRow = document.getElementById('colorRow');
+COLORS.forEach((c, i) => {
+  const thumb = document.createElement('div');
+  thumb.className = 'color-thumb' + (i === 0 ? ' active' : '');
+  thumb.title = c.name;
+  const img = document.createElement('img');
+  img.src = c.img;
+  img.alt = c.name;
+  thumb.appendChild(img);
+  thumb.addEventListener('click', () => {
+    document.querySelectorAll('.color-thumb').forEach(d => d.classList.remove('active'));
+    thumb.classList.add('active');
+    matBody.color.set(c.hex);
+    matBody.metalness = c.metal;
+    matBody.roughness = c.rough;
+    bodyMeshes.forEach(m => {
+      m.material.color.set(c.hex);
+      m.material.metalness = c.metal;
+      m.material.roughness = c.rough;
+    });
+  });
+  colorRow.appendChild(thumb);
+});
+
+// === CAMERA PRESETS ===
+const CAM_PRESETS = {
+  exterior: { pos: [6, 3, 8], target: [0, 0.8, 0] },
+  front:    { pos: [0, 2, 8], target: [0, 0.6, 0] },
+  rear:     { pos: [0, 2, -8], target: [0, 0.6, 0] },
+  side:     { pos: [10, 2, 0], target: [0, 0.6, 0] },
+  top:      { pos: [0, 12, 0.1], target: [0, 0, 0] },
+};
+
+document.querySelectorAll('.cam-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const preset = CAM_PRESETS[btn.dataset.cam];
+    if (!preset) return;
+
+    document.querySelectorAll('.cam-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Smooth camera transition
+    const startPos = camera.position.clone();
+    const endPos = new THREE.Vector3(...preset.pos);
+    const startTarget = controls.target.clone();
+    const endTarget = new THREE.Vector3(...preset.target);
+    const duration = 1000;
+    const startTime = performance.now();
+
+    function animateCam(now) {
+      const t = Math.min((now - startTime) / duration, 1);
+      const ease = 1 - Math.pow(1 - t, 3); // easeOutCubic
+      camera.position.lerpVectors(startPos, endPos, ease);
+      controls.target.lerpVectors(startTarget, endTarget, ease);
+      controls.update();
+      if (t < 1) requestAnimationFrame(animateCam);
+    }
+    requestAnimationFrame(animateCam);
+  });
+});
+
+// === AUTO-ROTATE TOGGLE ===
+const rotateBtn = document.getElementById('rotateBtn');
+rotateBtn.addEventListener('click', () => {
+  controls.autoRotate = !controls.autoRotate;
+  rotateBtn.classList.toggle('active', controls.autoRotate);
+});
+
+// === RENDER LOOP ===
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// === RESIZE ===
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>

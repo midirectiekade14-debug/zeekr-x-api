@@ -12,6 +12,13 @@ dependencies = [
     "requests (>=2.32.5,<3.0.0)"
 ]
 
+[project.optional-dependencies]
+dashboard = [
+    "fastapi (>=0.115.0)",
+    "uvicorn (>=0.34.0)",
+    "python-dotenv (>=1.0.0)",
+]
+
 [tool.poetry]
 packages = [{include = "zeekr_ev_api", from = "src"}]
 

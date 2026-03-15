@@ -27,7 +27,7 @@ class ZeekrClient:
         self,
         username: str | None = None,
         password: str | None = None,
-        country_code: str = "AU",
+        country_code: str = "NL",
         hmac_access_key: str = "",
         hmac_secret_key: str = "",
         password_public_key: str = "",
@@ -88,7 +88,7 @@ class ZeekrClient:
     def load_session(self, session_data: dict) -> None:
         """Loads a session from a dictionary."""
         self.username = session_data.get("username", "")
-        self.country_code = session_data.get("country_code", "AU")
+        self.country_code = session_data.get("country_code", "NL")
         self.auth_token = session_data.get("auth_token")
         self.bearer_token = session_data.get("bearer_token")
         self.user_info = session_data.get("user_info", {})
@@ -106,6 +106,12 @@ class ZeekrClient:
                 self.session.headers["authorization"] = self.auth_token
         else:
             self.logged_in = False
+
+        # Update region-specific headers
+        if self.region_code == "EU":
+            self.logged_in_headers["X-PROJECT-ID"] = "ZEEKR_EU"
+        elif self.region_code:
+            self.logged_in_headers["X-PROJECT-ID"] = f"ZEEKR_{self.region_code}"
 
     def export_session(self) -> dict:
         """Exports the current session to a dictionary."""
@@ -167,40 +173,40 @@ class ZeekrClient:
         self._bearer_login(tsp_code)
         self.logged_in = True
 
+    # EU country codes for direct URL assignment when API lookup fails
+    EU_COUNTRIES = {
+        "nl", "de", "fr", "be", "se", "no", "dk", "fi", "it", "es", "pt",
+        "at", "ch", "ie", "lu", "pl", "cz", "sk", "hu", "ro", "bg", "hr",
+        "si", "ee", "lv", "lt", "mt", "cy", "gr", "is",
+    }
+
     def _get_urls(self) -> None:
         """
-        Fetches the regional API URLs.
+        Fetches the regional API URLs, with EU fallback for known EU countries.
         """
-        urls = network.customGet(self, f"{const.APP_SERVER_HOST}{const.URL_URL}")
-        if not urls.get("success", False):
-            raise ZeekrException("Unable to fetch URL data")
+        try:
+            urls = network.customGet(self, f"{const.APP_SERVER_HOST}{const.URL_URL}")
+        except Exception as e:
+            self.logger.warning("URL fetch failed: %s", e)
+            urls = {}
 
-        url_data = urls.get("data", [])
         found = False
-        for url_block in url_data:
-            if url_block.get("countryCode", "").lower() == self.country_code.lower():
-                self.app_server_host = url_block.get("url", {}).get("appServerUrl", "")
-                self.usercenter_host = url_block.get("url", {}).get("userCenterUrl", "")
-                self.message_host = url_block.get("url", {}).get("messageCoreUrl", "")
-                self.region_code = url_block.get("regionCode", "SEA")
-                found = True
-                break
+        if urls.get("success", False):
+            url_data = urls.get("data", [])
+            for url_block in url_data:
+                if url_block.get("countryCode", "").lower() == self.country_code.lower():
+                    self.app_server_host = url_block.get("url", {}).get("appServerUrl", "")
+                    self.usercenter_host = url_block.get("url", {}).get("userCenterUrl", "")
+                    self.message_host = url_block.get("url", {}).get("messageCoreUrl", "")
+                    self.region_code = url_block.get("regionCode", "SEA")
+                    found = True
+                    break
 
         if not found:
-            eu_lookup = network.customGet(
-                self, f"{const.EU_APP_SERVER_HOST}{const.URL_URL}"
-            )
-            eu_has_country = False
-            if eu_lookup.get("success", False):
-                for region in eu_lookup.get("data", []):
-                    if region.get("countryCode", "").lower() == self.country_code.lower():
-                        eu_has_country = True
-                        break
-
-            if eu_has_country:
+            # Try EU lookup, or use hardcoded EU URLs for known EU countries
+            if self.country_code.lower() in self.EU_COUNTRIES:
                 self.logger.info(
-                    "Country %s found in EU region list; using EU hosts",
-                    self.country_code,
+                    "Using hardcoded EU hosts for country %s", self.country_code
                 )
                 self.app_server_host = const.EU_APP_SERVER_HOST
                 self.usercenter_host = const.EU_USERCENTER_HOST
@@ -712,6 +718,120 @@ class ZeekrClient:
 
         return journey_log_block.get("data", {})
 
+    def get_fence_list(self, vin: str) -> Dict[str, Any]:
+        """Fetches the list of geo-fences for a specific vehicle."""
+        if not self.logged_in:
+            raise ZeekrException("Not logged in")
+
+        headers = self.logged_in_headers.copy()
+        headers["X-VIN"] = self._get_encrypted_vin(vin)
+
+        fence_block = network.appSignedPost(
+            self,
+            f"{self.region_login_server}{const.FENCE_LIST_URL}",
+            "{}",
+            extra_headers=headers,
+        )
+        if not fence_block.get("success", False):
+            self.logger.debug("Failed to get fence list: %s", fence_block)
+            return {}
+
+        return fence_block.get("data", {})
+
+    def create_fence(
+        self, vin: str, name: str, lat: float, lon: float, radius: int = 500,
+        fence_type: str = "circle", notify_enter: bool = True, notify_exit: bool = True,
+    ) -> Dict[str, Any]:
+        """Creates a geo-fence."""
+        if not self.logged_in:
+            raise ZeekrException("Not logged in")
+
+        body = {
+            "name": name,
+            "type": fence_type,
+            "latitude": lat,
+            "longitude": lon,
+            "radius": radius,
+            "enterNotify": notify_enter,
+            "exitNotify": notify_exit,
+        }
+
+        fence_block = network.appSignedPost(
+            self,
+            f"{self.region_login_server}{const.FENCE_CREATE_URL}",
+            json.dumps(body, separators=(",", ":")),
+            extra_headers={"X-VIN": self._get_encrypted_vin(vin)},
+        )
+        return fence_block
+
+    def delete_fence(self, vin: str, fence_id: str) -> bool:
+        """Deletes a geo-fence."""
+        if not self.logged_in:
+            raise ZeekrException("Not logged in")
+
+        headers = self.logged_in_headers.copy()
+        headers["X-VIN"] = self._get_encrypted_vin(vin)
+
+        fence_block = network.appSignedGet(
+            self,
+            f"{self.region_login_server}{const.FENCE_DELETE_URL}?id={fence_id}",
+            headers=headers,
+        )
+        return fence_block.get("success", False)
+
+    def enable_fence(self, vin: str, fence_id: str, enabled: bool = True) -> bool:
+        """Enables or disables a geo-fence."""
+        if not self.logged_in:
+            raise ZeekrException("Not logged in")
+
+        headers = self.logged_in_headers.copy()
+        headers["X-VIN"] = self._get_encrypted_vin(vin)
+
+        fence_block = network.appSignedGet(
+            self,
+            f"{self.region_login_server}{const.FENCE_ENABLE_URL}?id={fence_id}&status={'true' if enabled else 'false'}",
+            headers=headers,
+        )
+        return fence_block.get("success", False)
+
+    def get_sentry_events(self, vin: str) -> Dict[str, Any]:
+        """Fetches sentry/alarm events."""
+        if not self.logged_in:
+            raise ZeekrException("Not logged in")
+
+        headers = self.logged_in_headers.copy()
+        headers["X-VIN"] = self._get_encrypted_vin(vin)
+
+        sentry_block = network.appSignedGet(
+            self,
+            f"{self.region_login_server}{const.SENTRY_EVENTS_URL}?alarmVin={vin}",
+            headers=headers,
+        )
+        if not sentry_block.get("success", False):
+            self.logger.debug("Failed to get sentry events: %s", sentry_block)
+            return {}
+
+        return sentry_block.get("data", {})
+
+    def get_sentry_pics(self, vin: str) -> Dict[str, Any]:
+        """Fetches dashcam/sentry pictures."""
+        if not self.logged_in:
+            raise ZeekrException("Not logged in")
+
+        headers = self.logged_in_headers.copy()
+        headers["X-VIN"] = self._get_encrypted_vin(vin)
+
+        pics_block = network.appSignedGet(
+            self,
+            f"{self.region_login_server}{const.SENTRY_PICS_URL}",
+            headers=headers,
+        )
+        if not pics_block.get("success", False):
+            self.logger.debug("Failed to get sentry pics: %s", pics_block)
+            return {}
+
+        return pics_block.get("data", {})
+
     def get_trip_trackpoints(
         self,
         vin: str,
@@ -743,6 +863,197 @@ class ZeekrClient:
             return {}
 
         return trackpoints_block.get("data", {})
+
+    # ── Door control ──────────────────────────────────────────────────────────
+
+    def lock_doors(self, vin: str) -> bool:
+        """Locks all doors remotely."""
+        return self.do_remote_control(vin, "lock", "RDL", {})
+
+    def unlock_doors(self, vin: str) -> bool:
+        """Unlocks all doors remotely."""
+        return self.do_remote_control(vin, "unlock", "RDL", {})
+
+    # ── Find car ──────────────────────────────────────────────────────────────
+
+    def find_car(self, vin: str) -> bool:
+        """Flashes lights and sounds horn to locate the car."""
+        return self.do_remote_control(vin, "start", "RDFL", {})
+
+    # ── Climate control ───────────────────────────────────────────────────────
+
+    def start_climate(
+        self,
+        vin: str,
+        temperature: float = 22.0,
+        seat_fl: int = 0,
+        seat_fr: int = 0,
+        seat_rl: int = 0,
+        seat_rr: int = 0,
+        steering_wheel: bool = False,
+        front_defrost: bool = False,
+        rear_defrost: bool = False,
+    ) -> bool:
+        """
+        Starts the climate control system (preheat/precool).
+
+        Args:
+            vin: Vehicle identification number.
+            temperature: Target cabin temperature in °C (e.g. 21.5).
+            seat_fl: Front-left seat heat level 0-3 (0=off).
+            seat_fr: Front-right seat heat level 0-3 (0=off).
+            seat_rl: Rear-left seat heat level 0-3 (0=off).
+            seat_rr: Rear-right seat heat level 0-3 (0=off).
+            steering_wheel: Enable steering wheel heating.
+            front_defrost: Enable front windshield defrost.
+            rear_defrost: Enable rear window defrost.
+
+        Returns:
+            True if successful.
+        """
+        setting = {
+            "ac": "true",
+            "temp": str(temperature),
+            "fsdhs": str(seat_fl),    # front seat driver heat
+            "fsphs": str(seat_fr),    # front seat passenger heat
+            "rsdhs": str(seat_rl),    # rear seat driver-side heat
+            "rsphs": str(seat_rr),    # rear seat passenger-side heat
+            "bw": "1" if steering_wheel else "0",
+            "dfst": "true" if front_defrost else "false",
+            "rdfst": "true" if rear_defrost else "false",
+        }
+        return self.do_remote_control(vin, "start", "RACMS", setting)
+
+    def stop_climate(self, vin: str) -> bool:
+        """Stops the climate control system."""
+        return self.do_remote_control(vin, "stop", "RACMS", {"ac": "false"})
+
+    def preheat(self, vin: str, temperature: float = 22.0) -> bool:
+        """Convenience: starts climate at the given temperature."""
+        return self.start_climate(vin, temperature=temperature)
+
+    def set_seat_heating(
+        self,
+        vin: str,
+        seat_fl: int = 0,
+        seat_fr: int = 0,
+        seat_rl: int = 0,
+        seat_rr: int = 0,
+    ) -> bool:
+        """
+        Sets seat heating levels without changing AC state.
+
+        Args:
+            seat_fl: Front-left heat level 0-3.
+            seat_fr: Front-right heat level 0-3.
+            seat_rl: Rear-left heat level 0-3.
+            seat_rr: Rear-right heat level 0-3.
+        """
+        setting = {
+            "fsdhs": str(seat_fl),
+            "fsphs": str(seat_fr),
+            "rsdhs": str(seat_rl),
+            "rsphs": str(seat_rr),
+        }
+        return self.do_remote_control(vin, "start", "RACMS", setting)
+
+    def set_seat_ventilation(
+        self,
+        vin: str,
+        seat_fl: int = 0,
+        seat_fr: int = 0,
+    ) -> bool:
+        """
+        Sets seat ventilation levels without changing AC state.
+
+        Args:
+            seat_fl: Front-left (driver) ventilation level 0-3 (0=off).
+            seat_fr: Front-right (passenger) ventilation level 0-3 (0=off).
+        """
+        setting = {"serviceParameters": [
+            {"key": "SV.driver", "value": "true" if seat_fl > 0 else "false"},
+            {"key": "SV.driver.level", "value": str(seat_fl)},
+            {"key": "SV.passenger", "value": "true" if seat_fr > 0 else "false"},
+            {"key": "SV.passenger.level", "value": str(seat_fr)},
+        ]}
+        return self.do_remote_control(vin, "start", "ZAF", setting)
+
+    def set_steering_wheel_heating(self, vin: str, level: int = 1) -> bool:
+        """Sets steering wheel heating level (0=off, 1-3=low/medium/high)."""
+        level = max(0, min(3, level))
+        enabled = "true" if level > 0 else "false"
+        setting = {"serviceParameters": [
+            {"key": "SW", "value": enabled},
+            {"key": "SW.level", "value": str(level)},
+        ]}
+        return self.do_remote_control(vin, "start", "ZAF", setting)
+
+    def set_fan_speed(self, vin: str, level: int = 1) -> bool:
+        """Sets HVAC fan/blower speed (0=off/auto, 1-7=speed levels)."""
+        level = max(0, min(7, level))
+        setting = {"serviceParameters": [
+            {"key": "AC.fan", "value": str(level)},
+        ]}
+        return self.do_remote_control(vin, "start", "ZAF", setting)
+
+    def defrost_front(self, vin: str, enabled: bool = True) -> bool:
+        """Enables or disables front windshield defrost."""
+        setting = {"dfst": "true" if enabled else "false"}
+        return self.do_remote_control(vin, "start", "RACMS", setting)
+
+    def defrost_rear(self, vin: str, enabled: bool = True) -> bool:
+        """Enables or disables rear window defrost."""
+        setting = {"rdfst": "true" if enabled else "false"}
+        return self.do_remote_control(vin, "start", "RACMS", setting)
+
+    # ── Window control ────────────────────────────────────────────────────────
+
+    def open_windows(self, vin: str) -> bool:
+        """Opens windows for ventilation (ventilate mode)."""
+        setting = {"serviceParameters": [
+            {"key": "target", "value": "ventilate"},
+        ]}
+        return self.do_remote_control(vin, "start", "RWS", setting)
+
+    def close_windows(self, vin: str) -> bool:
+        """Closes windows (stop ventilation)."""
+        setting = {"serviceParameters": [
+            {"key": "target", "value": "ventilate"},
+        ]}
+        return self.do_remote_control(vin, "stop", "RWS", setting)
+
+    # ── Charging control ──────────────────────────────────────────────────────
+
+    def start_charge(self, vin: str) -> bool:
+        """Starts charging immediately."""
+        return self.do_remote_control(vin, "start", "RCS", {})
+
+    def stop_charge(self, vin: str) -> bool:
+        """Stops charging."""
+        return self.do_remote_control(vin, "stop", "RCS", {})
+
+    def set_charge_limit(self, vin: str, limit_pct: int = 80) -> bool:
+        """
+        Sets the SoC charging limit (percentage).
+
+        Args:
+            vin: Vehicle identification number.
+            limit_pct: Target SoC limit in % (e.g. 80).
+
+        Returns:
+            True if successful.
+        """
+        if not self.logged_in:
+            raise ZeekrException("Not logged in")
+
+        body = {"soc": str(limit_pct)}
+        result = network.appSignedPost(
+            self,
+            f"{self.region_login_server}{const.SET_CHARGING_LIMIT_URL}",
+            json.dumps(body, separators=(",", ":")),
+            extra_headers={"X-VIN": self._get_encrypted_vin(vin)},
+        )
+        return result.get("success", False)
 
 
 class Vehicle:
@@ -862,7 +1173,123 @@ class Vehicle:
         )
 
     def get_trip_trackpoints(self, trip_report_time: int, trip_id: int) -> Dict[str, Any]:
-        """
-        Fetches detailed trackpoints for a specific trip.
-        """
+        """Fetches detailed trackpoints for a specific trip."""
         return self._client.get_trip_trackpoints(self.vin, trip_report_time, trip_id)
+
+    def get_fence_list(self) -> Dict[str, Any]:
+        """Fetches geo-fences."""
+        return self._client.get_fence_list(self.vin)
+
+    def create_fence(self, name: str, lat: float, lon: float, radius: int = 500, **kw) -> Dict[str, Any]:
+        """Creates a geo-fence."""
+        return self._client.create_fence(self.vin, name, lat, lon, radius, **kw)
+
+    def delete_fence(self, fence_id: str) -> bool:
+        """Deletes a geo-fence."""
+        return self._client.delete_fence(self.vin, fence_id)
+
+    def enable_fence(self, fence_id: str, enabled: bool = True) -> bool:
+        """Enables/disables a geo-fence."""
+        return self._client.enable_fence(self.vin, fence_id, enabled)
+
+    def get_sentry_events(self) -> Dict[str, Any]:
+        """Fetches sentry events."""
+        return self._client.get_sentry_events(self.vin)
+
+    def get_sentry_pics(self) -> Dict[str, Any]:
+        """Fetches dashcam pictures."""
+        return self._client.get_sentry_pics(self.vin)
+
+    # ── Door control ──────────────────────────────────────────────────────────
+
+    def lock(self) -> bool:
+        """Locks all doors."""
+        return self._client.lock_doors(self.vin)
+
+    def unlock(self) -> bool:
+        """Unlocks all doors."""
+        return self._client.unlock_doors(self.vin)
+
+    # ── Find car ──────────────────────────────────────────────────────────────
+
+    def find(self) -> bool:
+        """Flashes lights and sounds horn."""
+        return self._client.find_car(self.vin)
+
+    # ── Climate ───────────────────────────────────────────────────────────────
+
+    def start_climate(
+        self,
+        temperature: float = 22.0,
+        seat_fl: int = 0,
+        seat_fr: int = 0,
+        seat_rl: int = 0,
+        seat_rr: int = 0,
+        steering_wheel: bool = False,
+        front_defrost: bool = False,
+        rear_defrost: bool = False,
+    ) -> bool:
+        """Starts climate control with optional seat heating and defrost."""
+        return self._client.start_climate(
+            self.vin, temperature, seat_fl, seat_fr, seat_rl, seat_rr,
+            steering_wheel, front_defrost, rear_defrost,
+        )
+
+    def stop_climate(self) -> bool:
+        """Stops climate control."""
+        return self._client.stop_climate(self.vin)
+
+    def preheat(self, temperature: float = 22.0) -> bool:
+        """Preheats the cabin to the given temperature."""
+        return self._client.preheat(self.vin, temperature)
+
+    def set_seat_heating(
+        self, seat_fl: int = 0, seat_fr: int = 0,
+        seat_rl: int = 0, seat_rr: int = 0,
+    ) -> bool:
+        """Sets seat heating levels (0=off, 1-3=low/medium/high)."""
+        return self._client.set_seat_heating(self.vin, seat_fl, seat_fr, seat_rl, seat_rr)
+
+    def set_seat_ventilation(self, seat_fl: int = 0, seat_fr: int = 0) -> bool:
+        """Sets seat ventilation levels (0=off, 1-3=low/medium/high)."""
+        return self._client.set_seat_ventilation(self.vin, seat_fl, seat_fr)
+
+    def set_steering_wheel_heating(self, level: int = 1) -> bool:
+        """Sets steering wheel heating level (0=off, 1-3=low/medium/high)."""
+        return self._client.set_steering_wheel_heating(self.vin, level)
+
+    def set_fan_speed(self, level: int = 1) -> bool:
+        """Sets HVAC fan/blower speed (0=off/auto, 1-7=speed levels)."""
+        return self._client.set_fan_speed(self.vin, level)
+
+    def defrost_front(self, enabled: bool = True) -> bool:
+        """Enables or disables front windshield defrost."""
+        return self._client.defrost_front(self.vin, enabled)
+
+    def defrost_rear(self, enabled: bool = True) -> bool:
+        """Enables or disables rear window defrost."""
+        return self._client.defrost_rear(self.vin, enabled)
+
+    # ── Windows ───────────────────────────────────────────────────────────────
+
+    def open_windows(self) -> bool:
+        """Opens windows for ventilation."""
+        return self._client.open_windows(self.vin)
+
+    def close_windows(self) -> bool:
+        """Closes windows (stop ventilation)."""
+        return self._client.close_windows(self.vin)
+
+    # ── Charging ──────────────────────────────────────────────────────────────
+
+    def start_charge(self) -> bool:
+        """Starts charging."""
+        return self._client.start_charge(self.vin)
+
+    def stop_charge(self) -> bool:
+        """Stops charging."""
+        return self._client.stop_charge(self.vin)
+
+    def set_charge_limit(self, limit_pct: int = 80) -> bool:
+        """Sets the SoC charging limit in %."""
+        return self._client.set_charge_limit(self.vin, limit_pct)

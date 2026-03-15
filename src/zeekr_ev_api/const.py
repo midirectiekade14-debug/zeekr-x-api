@@ -36,8 +36,21 @@ SET_TRAVEL_PLAN_URL = "ms-charge-manage/api/v1.0/charge/setTravelPlan"
 JOURNEY_LOG_URL = "ms-vehicle-trail/v1.0/journalLog/trip/listForPage"
 TRIP_TRACKPOINTS_URL = "ms-vehicle-trail/v1.0/journalLog/trackpoint/list"
 
-COUNTRY_CODE = "AU"
-REGION_CODE = "SEA"
+SET_CHARGING_LIMIT_URL = "ms-charge-manage/api/v1.0/charge/setSoc"
+
+# Geo-fencing
+FENCE_CREATE_URL = "ms-vehicle-defence/v1/fence/create"
+FENCE_DELETE_URL = "ms-vehicle-defence/v1/fence/delete"
+FENCE_ENABLE_URL = "ms-vehicle-defence/v1/fence/enable"
+FENCE_UPDATE_URL = "ms-vehicle-defence/v1/fence/update"
+FENCE_LIST_URL = "ms-vehicle-defence/v1/fence/page"
+
+# Sentry / Dashcam
+SENTRY_EVENTS_URL = "sentinel-monitoring-service/api/v1/alarm/event/query"
+SENTRY_PICS_URL = "sentinel-monitoring-service/api/v1/pic/list"
+
+COUNTRY_CODE = "NL"
+REGION_CODE = "EU"
 
 REGION_LOGIN_SERVERS = {
     "SEA": "https://sea-snc-tsp-api-gw.zeekrlife.com/",
@@ -47,12 +60,12 @@ REGION_LOGIN_SERVERS = {
 }
 
 # Secrets
-HMAC_ACCESS_KEY = ""
-HMAC_SECRET_KEY = ""
-PASSWORD_PUBLIC_KEY = ""
-PROD_SECRET = ""
-VIN_KEY = ""
-VIN_IV = ""
+HMAC_ACCESS_KEY = "c6163310f263911af87194dd290247fd"  # from libHttpSecretKey.so
+HMAC_SECRET_KEY = "b816ffc222a657bef362d874a60337de"  # from libAppSecret.so
+PASSWORD_PUBLIC_KEY = "MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA1OyKm3Ig/6eibB7Uz2o93UqGk2M784WdfF8mvffvu218d61G5M3Px54E3kefUTk5Ky1ywHvw7Rp9KDuYv7ktaHkk+yr59Ihseu3a7iM/C6SnMSGt+LfB/Bcob9Abw95EigXQ4yQddX9hbNrin3AwZw8wMjEISYYDo5GuYDL0NbAiYg2Y5GpfYIqRzoi6GqDz+evLrsl20kJeCEPgJZN4Jg00Iq9k++EKOZ5Jc/Zx22ZUgKpdwKABkvzshEgG6WWUPB+gosOiLv++inu/9blDpEzQZhjZ9WVHpURHDK1YlCvubVAMhDpnbqNHZ0AxlPletdoyugrH/OLKl5inhMXNj3Re7Hl8WsBWLUKp6sXFf0dvSFzqnr2jkhicS+K2IYZnjghC9cOBRO8fnkonh0EBt0evjUIKr5ClbCKioBX8JU+d4ldtWOpp2FlxeFTLreDJ5ZBU4//bQpTwYMt7gwMK+MO5WtokUx3UF98Z6GdUgbl6nBjBe82c7oIQXhHGHPnURQO7DDPgyVnNOnTPIkmiHJh/e3vkVhiZNHFCCLTip6GoJVrLxwb9i4q+d0thw4doxVJ5NB9OfDMV64/ybJgpf7m3Ld2yE0gsf1prrRlDFDXjlYyqqpf1l9Y0u3ctXo7UpXMgbyDEpUQhq3a7txZQO/17luTDoA6Tz1ADavvBwHkCAwEAAQ=="  # RSA-4096 DER base64 from classes3.dex
+PROD_SECRET = "890efe3207af95348b95f66b2ee7da04"  # from SignInterceptor (v2.9.9 PROD signing key)
+VIN_KEY = "a01a6db985a2f5d4"  # from libcrypto-util.so (AES key for VIN encryption)
+VIN_IV = "ed446b8b8845013d"  # from libcrypto-util.so (AES IV for VIN encryption)
 
 DEFAULT_HEADERS = {
     "accept-encoding": "gzip",
@@ -62,7 +75,7 @@ DEFAULT_HEADERS = {
     "appcode": "eu-app",
     "appid": "TSP",
     "appsecret": "zeekr_tis",
-    "appversion": "1.4.1",
+    "appversion": "2.9.9",
     "call-source": "android",
     "client-id": "1JwLroFkFFIpgFGdTRrm4_nzkkwDkfHj7RxJQb7J8tc",
     "Content-Type": "application/json; charset=UTF-8",
@@ -74,7 +87,7 @@ DEFAULT_HEADERS = {
     "msgclientid": "1003",
     "registcountry": COUNTRY_CODE,
     "tmp-tenant-code": "3300743799505195008",
-    "user-agent": "Device/GoogleAppName/com.zeekr.globalAppVersion/1.4.1Platform/androidOSVersion/16Ditto/true",
+    "user-agent": "Device/GoogleAppName/com.zeekr.overseasAppVersion/2.9.9Platform/androidOSVersion/16Ditto/true",
 }
 
 LOGGED_IN_HEADERS = {

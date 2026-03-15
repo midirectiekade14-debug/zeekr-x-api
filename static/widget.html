@@ -1,0 +1,2849 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ZEEKR</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  @font-face { font-family: 'ZeekrHeadline'; src: url('/static/ZeekrHeadline-Regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+  @font-face { font-family: 'ZeekrText'; src: url('/static/ZeekrText-Regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+  @font-face { font-family: 'ZeekrText'; src: url('/static/ZeekrText-Medium.woff2') format('woff2'); font-weight: 500; font-display: swap; }
+  @font-face { font-family: 'Lynkcotype'; src: url('/static/lynkcotype_bold.otf'); font-weight: 700; }
+  @font-face { font-family: 'RobotoNum'; src: url('/static/roboto_medium_numbers.ttf'); font-weight: 500; }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #F4F4F8;
+    --card: #FFFFFF;
+    --card-alt: #F0F0F5;
+    --surface: #E5E5EA;
+    --border: rgba(0,0,0,0.05);
+    --divider: rgba(0,0,0,0.05);
+    --primary: #ED8733;
+    --primary-hover: #D97A2B;
+    --primary-dim: rgba(237,135,51,0.07);
+    --text: rgba(0,0,0,0.88);
+    --text2: rgba(0,0,0,0.48);
+    --text3: rgba(0,0,0,0.22);
+    --success: #30D158;
+    --danger: #FF453A;
+    --info: #0A84FF;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,0.10);
+    --radius: 14px;
+    --radius-sm: 10px;
+    --radius-pill: 100px;
+    --hero-bg: #F0F0F2;
+    --glass: rgba(255,255,255,0.72);
+    --glass-border: rgba(255,255,255,0.5);
+  }
+
+  html, body {
+    font-family: 'ZeekrText', -apple-system, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100%; width: 100%;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    line-height: 1.5;
+    font-size: 14px;
+  }
+
+  .app {
+    display: flex; flex-direction: column;
+    min-height: 100vh;
+    max-width: 430px; margin: 0 auto;
+    position: relative;
+  }
+
+  /* SVG icons — consistent 20px line icons */
+  .icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+  .icon-sm { width: 16px; height: 16px; }
+  .icon-lg { width: 24px; height: 24px; }
+
+  /* Connection dot */
+  .conn-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--text3); flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .conn-dot.online { background: var(--success); }
+  .conn-dot.offline { background: var(--danger); }
+
+  /* === Titlebar === */
+  .titlebar {
+    position: absolute; top: 0; left: 0; right: 0;
+    z-index: 30; display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 20px 0;
+  }
+  .titlebar-name {
+    font-family: 'ZeekrHeadline', sans-serif;
+    font-size: 20px; font-weight: 400; color: var(--text);
+    letter-spacing: 0.3px;
+  }
+  .titlebar-right { display: flex; align-items: center; gap: 12px; }
+  .titlebar-sub { font-size: 12px; color: var(--text2); }
+  .icon-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text); cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .icon-btn:active { transform: scale(0.88); opacity: 0.7; }
+
+  .page-titlebar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 20px;
+    background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--glass-border);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .page-titlebar .titlebar-name { font-size: 17px; }
+  .page-titlebar .icon-btn { background: var(--card-alt); }
+
+  /* === Car hero === */
+  .car-hero {
+    position: relative;
+    background: linear-gradient(180deg, #EEEEF3 0%, #F0F0F5 40%, var(--bg) 100%);
+    padding: 52px 0 0;
+    display: flex; flex-direction: column; align-items: center;
+    overflow: visible;
+  }
+  .car-hero-body {
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; padding: 0 0;
+  }
+  .car-glow {
+    position: absolute; top: 35%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 320px; height: 320px;
+    background: none;
+    border-radius: 50%; pointer-events: none;
+    transition: all 0.8s;
+  }
+  .car-glow.charging {
+    background: radial-gradient(circle, rgba(237,135,51,0.18) 0%, transparent 70%);
+    animation: glow-pulse 2.5s ease-in-out infinite;
+  }
+  @keyframes glow-pulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+
+  .car-stack {
+    position: relative; z-index: 1;
+    width: 88%; max-width: 380px;
+    flex-shrink: 0;
+  }
+  .car-stack img {
+    width: 100%; display: block;
+    filter: drop-shadow(0 24px 48px rgba(0,0,0,0.18)) drop-shadow(0 8px 16px rgba(0,0,0,0.08));
+    transition: opacity 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  .car-stack .car-overlay {
+    position: absolute; top: 0; left: 0; width: 100%;
+    opacity: 0; transition: opacity 0.4s;
+  }
+  .car-stack .car-overlay.active { opacity: 1; }
+
+
+  /* === SOC arc gauge === */
+  .soc-below {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center;
+    padding: 8px 0 8px;
+    margin-top: -8px;
+  }
+  .soc-gauge-wrap {
+    position: relative; width: 170px; height: 95px;
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  .soc-gauge-svg {
+    position: absolute; top: 0; left: 0; width: 170px; height: 95px;
+  }
+  .soc-arc-bg {
+    fill: none; stroke: var(--surface); stroke-width: 7;
+    stroke-linecap: round;
+  }
+  .soc-arc-fill {
+    fill: none; stroke: var(--success); stroke-width: 7;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), stroke 0.6s;
+    filter: drop-shadow(0 0 8px rgba(48,209,88,0.35));
+  }
+  .soc-arc-fill.charging {
+    animation: arc-charge-pulse 2s ease-in-out infinite;
+  }
+  @keyframes arc-charge-pulse {
+    0%,100% { filter: drop-shadow(0 0 6px rgba(237,135,51,0.3)); }
+    50% { filter: drop-shadow(0 0 14px rgba(237,135,51,0.6)); }
+  }
+  .soc-center {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column; align-items: center;
+    padding-bottom: 8px;
+  }
+  .soc-value {
+    font-family: 'RobotoNum', 'Lynkcotype', sans-serif;
+    font-size: 46px; font-weight: 700; letter-spacing: -2.5px; line-height: 1;
+    color: var(--text);
+  }
+  .soc-pct {
+    font-size: 17px; font-weight: 400; color: rgba(0,0,0,0.35);
+    margin-left: 1px;
+  }
+  .soc-row { display: flex; align-items: baseline; gap: 1px; }
+  .soc-range {
+    font-size: 12px; color: rgba(0,0,0,0.35); margin-top: 2px; text-align: center;
+    letter-spacing: 0.3px;
+  }
+  .charge-badge {
+    display: none; align-items: center; gap: 5px;
+    margin-top: 6px; padding: 5px 12px;
+    background: rgba(237,135,51,0.1); border-radius: var(--radius-pill);
+    font-size: 11px; font-weight: 500; color: var(--primary);
+    box-shadow: 0 1px 4px rgba(237,135,51,0.1);
+  }
+  .charge-badge.active { display: inline-flex; }
+
+  /* === Location map on homescreen === */
+  .home-map-section { padding: 0 20px 16px; }
+  .home-map-wrap {
+    border-radius: var(--radius); overflow: hidden;
+    height: 180px; position: relative;
+    border: 1px solid rgba(0,0,0,0.04);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .home-map-wrap .leaflet-container { height: 100%; width: 100%; }
+  .home-map-address {
+    font-size: 12px; color: var(--text2); margin-top: 8px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .home-map-address .map-addr-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .home-map-time { font-size: 11px; color: var(--text3); }
+  .btn-navigate {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 18px; border-radius: var(--radius-pill);
+    background: var(--primary); color: #fff; border: none;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94); margin-top: 8px;
+    box-shadow: 0 2px 8px rgba(237,135,51,0.25);
+  }
+  .btn-navigate:active { transform: scale(0.95); opacity: 0.85; }
+
+  /* === Main card === */
+  .main-card {
+    position: relative; z-index: 5;
+    background: var(--card);
+    border-radius: 24px 24px 0 0;
+    margin-top: -12px;
+    min-height: calc(100vh - 360px);
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.06), 0 -1px 4px rgba(0,0,0,0.03);
+  }
+  .drag-handle { display: flex; justify-content: center; padding: 12px 0 4px; }
+  .drag-handle-bar { width: 40px; height: 4px; border-radius: var(--radius-pill); background: var(--surface); opacity: 0.6; }
+
+  /* === Quick actions === */
+  .qa-section { padding: 20px 20px 20px; }
+  .qa-row { display: flex; justify-content: space-between; }
+  .qa-item {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .qa-circle {
+    width: 50px; height: 50px; border-radius: 50%;
+    background: var(--card-alt);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text2);
+    transition: all 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    border: 1.5px solid transparent;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.8);
+  }
+  .qa-circle:active { transform: scale(0.88); }
+  .qa-circle.active-state {
+    background: var(--primary-dim); color: var(--primary); border-color: var(--primary);
+    box-shadow: 0 2px 8px rgba(237,135,51,0.2);
+  }
+  .qa-circle.cmd-sent {
+    background: var(--success); color: #fff; border-color: var(--success);
+    box-shadow: 0 2px 12px rgba(48,209,88,0.35);
+    animation: cmdPulse 0.6s ease-out;
+  }
+  @keyframes cmdPulse {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(48,209,88,0.5); }
+    50% { transform: scale(1.08); box-shadow: 0 0 0 14px rgba(48,209,88,0); }
+    100% { transform: scale(1); box-shadow: 0 2px 12px rgba(48,209,88,0.35); }
+  }
+  .qa-label { font-size: 11px; color: var(--text2); text-align: center; letter-spacing: 0.1px; }
+
+  /* === Section === */
+  .section-divider { height: 1px; background: var(--divider); margin: 0 20px; }
+  .section-header {
+    font-family: 'ZeekrHeadline', sans-serif;
+    font-size: 15px; font-weight: 400; color: var(--text);
+    padding: 20px 20px 12px; letter-spacing: 0.3px;
+  }
+
+  /* === Detail list === */
+  .detail-list { padding: 0 20px; }
+  .detail-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 13px 0; border-bottom: 1px solid var(--divider);
+  }
+  .detail-item:last-child { border-bottom: none; }
+  .dl-label { font-size: 14px; color: var(--text2); }
+  .dl-value { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* === Feature cards === */
+  .feature-card {
+    background: var(--card-alt);
+    border-radius: var(--radius); margin: 0 20px 8px;
+    padding: 14px 16px; display: flex; align-items: center;
+    justify-content: space-between;
+    cursor: pointer; transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    border: 1px solid rgba(0,0,0,0.02);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  }
+  .feature-card:active { transform: scale(0.98); opacity: 0.85; }
+  .fc-left { display: flex; align-items: center; gap: 12px; }
+  .fc-icon { color: var(--text2); display: flex; }
+  .fc-text { display: flex; flex-direction: column; }
+  .fc-name { font-size: 14px; font-weight: 500; color: var(--text); }
+  .fc-desc { font-size: 12px; color: var(--text3); margin-top: 1px; }
+  .fc-arrow { color: var(--text3); display: flex; }
+
+  /* === Slider component === */
+  .slider-group { padding: 0 20px; margin-bottom: 12px; touch-action: pan-y; }
+  .slider-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 6px;
+  }
+  .slider-title { font-size: 12px; font-weight: 500; color: var(--text2); }
+  .slider-val {
+    font-family: 'RobotoNum', 'Lynkcotype', sans-serif;
+    font-size: 12px; font-weight: 700; color: var(--primary);
+    min-width: 36px; text-align: right;
+  }
+  .zk-slider {
+    -webkit-appearance: none; appearance: none;
+    width: 280px; max-width: 100%; height: 6px;
+    border-radius: 3px;
+    background: var(--surface);
+    outline: none; cursor: pointer;
+    touch-action: none; /* slider grabs touch explicitly — container handles scroll */
+  }
+  .zk-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 26px; height: 26px; border-radius: 50%;
+    background: #fff; border: 2px solid var(--surface);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+    cursor: grab; transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  .zk-slider:active::-webkit-slider-thumb {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px var(--primary-dim), 0 2px 6px rgba(0,0,0,0.12);
+    cursor: grabbing; transform: scale(1.12);
+  }
+  .zk-slider::-moz-range-thumb {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: #fff; border: 2px solid var(--surface);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    cursor: grab;
+  }
+  .slider-ticks {
+    display: flex; justify-content: space-between;
+    width: 280px; max-width: 100%;
+    padding: 4px 0 0; font-size: 11px; color: var(--text3);
+  }
+
+  /* === Setting row: buttons + activation toggle === */
+  .setting-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 20px; margin-bottom: 12px; touch-action: pan-y;
+  }
+  .setting-btn-area { flex: 1; min-width: 0; }
+  .setting-btn-area .level-label { font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
+
+  /* === Level button groups === */
+  .level-btns {
+    display: flex; gap: 6px; padding: 0 20px; margin-bottom: 12px;
+  }
+  .level-btns.compact { padding: 0; }
+  .level-btn {
+    flex: 1; padding: 8px 4px; border-radius: var(--radius);
+    background: var(--card-alt); border: 1px solid var(--surface);
+    color: var(--text2); font-size: 11px; font-weight: 500;
+    text-align: center; cursor: pointer; transition: all 0.15s;
+    user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .level-btn:active { transform: scale(0.96); }
+  .level-btn.active {
+    background: var(--primary-dim); border-color: var(--primary);
+    color: var(--primary); font-weight: 600;
+  }
+  .ph-lvl-btn {
+    padding: 4px 8px; border-radius: var(--radius);
+    background: var(--card-alt); border: 1px solid var(--surface);
+    color: var(--text2); font-size: 11px; font-weight: 500;
+    cursor: pointer; transition: all 0.15s; user-select: none;
+  }
+  .ph-lvl-btn.active {
+    background: var(--primary-dim); border-color: var(--primary);
+    color: var(--primary); font-weight: 600;
+  }
+  .mini-toggle {
+    position: relative; width: 52px; height: 30px; flex-shrink: 0;
+    cursor: pointer;
+  }
+  .mini-toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .mini-toggle .mt-track {
+    position: absolute; inset: 0; border-radius: 15px;
+    background: var(--surface); transition: background 0.25s;
+  }
+  .mini-toggle .mt-thumb {
+    position: absolute; top: 3px; left: 3px;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    transition: transform 0.25s;
+  }
+  .mini-toggle input:checked + .mt-track { background: var(--success); }
+  .mini-toggle input:checked + .mt-track .mt-thumb { transform: translateX(22px); }
+
+  /* === Pill buttons === */
+  .pill-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 10px 18px; border-radius: var(--radius-pill);
+    background: var(--card-alt); border: 1px solid rgba(0,0,0,0.03);
+    color: var(--text); font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    font-family: inherit;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .pill-btn:active { transform: scale(0.95); opacity: 0.85; }
+  .pill-btn.cmd-sending {
+    position: relative; pointer-events: none; opacity: 0.7;
+  }
+  .pill-btn.cmd-sending::after {
+    content: ''; position: absolute; width: 14px; height: 14px;
+    border: 2px solid transparent; border-top-color: currentColor;
+    border-radius: 50%; animation: btnSpin 0.6s linear infinite;
+  }
+  .pill-btn.cmd-ok {
+    background: var(--success) !important; color: #fff !important;
+    border-color: var(--success) !important;
+    animation: cmdFlash 0.3s ease-out;
+  }
+  .pill-btn.cmd-err {
+    background: var(--danger) !important; color: #fff !important;
+    border-color: var(--danger) !important;
+    animation: cmdFlash 0.3s ease-out;
+  }
+  @keyframes btnSpin { to { transform: rotate(360deg); } }
+  @keyframes cmdFlash {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+  .pill-btn.active { border-color: var(--primary); color: var(--primary); background: var(--primary-dim); }
+  .pill-btn.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .pill-btn.primary:active { background: var(--primary-hover); }
+  .pill-btn.on { background: var(--success); color: #fff; border-color: var(--success); }
+  .pill-btn.on:active { opacity: 0.8; }
+  .pill-btn.off { background: var(--card-alt); color: var(--text2); border-color: var(--surface); }
+  .pill-btn.off:active { opacity: 0.8; }
+
+  /* Toggle switch */
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 0; gap: 12px;
+  }
+  .toggle-label { font-size: 14px; font-weight: 500; color: var(--text); }
+  .toggle-status { font-size: 12px; color: var(--text2); margin-left: 4px; }
+  .toggle-switch {
+    position: relative; width: 52px; height: 30px; flex-shrink: 0; cursor: pointer;
+  }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .toggle-track {
+    position: absolute; inset: 0; border-radius: 15px;
+    background: var(--surface); transition: background 0.25s;
+  }
+  .toggle-thumb {
+    position: absolute; top: 3px; left: 3px;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  .toggle-switch input:checked + .toggle-track { background: var(--success); box-shadow: 0 0 8px rgba(48,209,88,0.2); }
+  .toggle-switch input:checked + .toggle-track .toggle-thumb { transform: translateX(22px); }
+  .pill-btn.outline-danger { border-color: var(--danger); color: var(--danger); background: rgba(255,59,48,0.04); }
+
+  /* === SOC ring === */
+  /* === Charge page: SVG arc gauge === */
+  /* === Charge stats (4 col) === */
+  .charge-stats {
+    display: grid; grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 8px; padding: 0 20px; margin: 8px 0 4px;
+  }
+  .charge-stat {
+    background: var(--card-alt); border-radius: var(--radius);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 12px 4px;
+    border: 1px solid rgba(0,0,0,0.02);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  }
+  .cs-label {
+    font-size: 10px; color: var(--text3); margin-bottom: 6px;
+    text-transform: uppercase; letter-spacing: 0.5px; text-align: center;
+  }
+  .cs-value {
+    font-family: 'RobotoNum', 'Lynkcotype', sans-serif;
+    font-size: 18px; font-weight: 700;
+  }
+  .cs-unit { font-size: 10px; color: var(--text2); margin-left: 1px; }
+
+  .charge-time {
+    text-align: center; padding: 8px 0;
+    font-size: 13px; color: var(--text2);
+  }
+  /* === Climate page === */
+  .climate-temp-display { text-align: center; margin: 8px 0 4px; }
+  .climate-temp-val {
+    font-family: 'RobotoNum', 'Lynkcotype', sans-serif;
+    font-size: 28px; font-weight: 700;
+  }
+  .climate-temp-label { font-size: 12px; color: var(--text3); margin-top: 2px; }
+  .climate-quick { display: flex; gap: 8px; padding: 16px 20px 24px; }
+
+  /* === Control grid === */
+  .ctrl-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 8px; padding: 0 20px;
+  }
+  .ctrl-card {
+    background: var(--card-alt); border-radius: var(--radius); padding: 16px 14px;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    display: flex; flex-direction: column; gap: 8px;
+    border: 1px solid rgba(0,0,0,0.03);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,0.7);
+  }
+  .ctrl-card:active { transform: scale(0.97); opacity: 0.85; }
+  .ctrl-card.cmd-sent {
+    border-color: rgba(48,209,88,0.4); background: rgba(48,209,88,0.08);
+    box-shadow: 0 2px 12px rgba(48,209,88,0.15), inset 0 1px 0 rgba(48,209,88,0.1);
+    animation: cardPulse 0.5s ease-out;
+  }
+  @keyframes cardPulse {
+    0% { box-shadow: 0 0 0 0 rgba(48,209,88,0.35); }
+    100% { box-shadow: 0 2px 12px rgba(48,209,88,0.15); }
+  }
+  .ctrl-card .ctrl-icon { color: var(--text2); display: flex; transition: color 0.2s; }
+  .ctrl-card.cmd-sent .ctrl-icon { color: var(--success); }
+  .ctrl-card .ctrl-name { font-size: 13px; font-weight: 500; letter-spacing: 0.1px; }
+  .ctrl-card .ctrl-desc { font-size: 11px; color: var(--text3); line-height: 1.4; }
+  .ctrl-expand {
+    display: none; padding: 12px 0 0;
+    border-top: 1px solid var(--divider); margin-top: 8px;
+  }
+  .ctrl-card.expanded .ctrl-expand { display: block; }
+  .ctrl-card.expanded {
+    grid-column: 1 / -1; border-color: rgba(237,135,51,0.3); background: var(--primary-dim);
+    box-shadow: 0 2px 12px rgba(237,135,51,0.1);
+  }
+
+  /* === Vehicle visual: photo top-down view === */
+  .vehicle-wrap {
+    position: relative; width: 280px; height: 378px;
+    margin: 0 auto;
+  }
+  .vehicle-photo {
+    width: 100%; height: 100%; object-fit: contain;
+    opacity: 0.9;
+  }
+  /* Toggle tabs */
+  .vv-tabs {
+    display: flex; justify-content: center; gap: 4px; padding: 8px 20px;
+  }
+  .vv-tab {
+    flex: 1; max-width: 140px; padding: 8px 0; border-radius: var(--radius-pill);
+    font-size: 12px; font-weight: 500; text-align: center; cursor: pointer;
+    background: var(--card-alt); color: var(--text2); border: none;
+    transition: all 0.2s; font-family: inherit;
+  }
+  .vv-tab.active { background: var(--primary); color: #fff; }
+  /* Overlay layer */
+  .vv-layer { position: absolute; inset: 0; transition: opacity 0.3s; }
+  .vv-layer.hidden { opacity: 0; pointer-events: none; }
+  /* Tyre pills — positioned over wheels */
+  .tp {
+    position: absolute; display: flex; flex-direction: column; align-items: center;
+    background: rgba(255,255,255,0.92); border-radius: 10px; padding: 5px 9px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1); min-width: 52px;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.6);
+  }
+  .tp.warn { background: rgba(255,59,48,0.1); }
+  .tp-bar {
+    font-family: 'RobotoNum', sans-serif; font-size: 14px; font-weight: 700;
+    color: var(--text); line-height: 1;
+  }
+  .tp-bar.warn { color: var(--danger); }
+  .tp-temp { font-size: 10px; color: var(--text3); margin-top: 1px; }
+  /* Tyre positions (% based) */
+  .tp-fl { top: 13%; left: -4%; }
+  .tp-fr { top: 13%; right: -4%; }
+  .tp-rl { top: 65%; left: -4%; }
+  .tp-rr { top: 65%; right: -4%; }
+  /* Door/window dots */
+  .dd {
+    position: absolute; width: 24px; height: 24px;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    transition: all 0.3s;
+  }
+  .dd .dd-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dd.closed { background: rgba(52,199,89,0.15); }
+  .dd.closed .dd-dot { background: var(--success); }
+  .dd.open { background: rgba(255,59,48,0.15); }
+  .dd.open .dd-dot { background: var(--danger); }
+  .dd-label {
+    position: absolute; font-size: 8px; font-weight: 600; color: var(--text3);
+    text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap;
+  }
+  /* Door positions */
+  .dd-fl { top: 24%; left: 6%; }
+  .dd-fl .dd-label { left: -24px; }
+  .dd-fr { top: 24%; right: 6%; }
+  .dd-fr .dd-label { right: -22px; }
+  .dd-rl { top: 54%; left: 6%; }
+  .dd-rl .dd-label { left: -24px; }
+  .dd-rr { top: 54%; right: 6%; }
+  .dd-rr .dd-label { right: -22px; }
+  .dd-trunk { bottom: 3%; left: 50%; transform: translateX(-50%); }
+  .dd-trunk .dd-label { bottom: -14px; left: 50%; transform: translateX(-50%); }
+  .dd-hood { top: 1%; left: 50%; transform: translateX(-50%); }
+  .dd-hood .dd-label { top: -14px; left: 50%; transform: translateX(-50%); }
+  /* Window bars along doors */
+  .wbar {
+    position: absolute; width: 3px; height: 16px; border-radius: 2px;
+    transition: background 0.3s;
+  }
+  .wbar.closed { background: var(--success); opacity: 0.4; }
+  .wbar.open { background: var(--primary); opacity: 1; }
+  .wbar-fl { top: 24%; left: 18%; }
+  .wbar-fr { top: 24%; right: 18%; }
+  .wbar-rl { top: 54%; left: 18%; }
+  .wbar-rr { top: 54%; right: 18%; }
+  /* Lock status pill */
+  .lock-status {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 8px 18px; border-radius: var(--radius-pill);
+    font-size: 13px; font-weight: 500; margin: 4px auto 0; width: fit-content;
+    transition: all 0.3s;
+  }
+  .lock-status.locked { background: rgba(48,209,88,0.08); color: var(--success); box-shadow: 0 1px 4px rgba(48,209,88,0.1); }
+  .lock-status.unlocked { background: rgba(255,69,58,0.08); color: var(--danger); box-shadow: 0 1px 4px rgba(255,69,58,0.1); }
+
+  /* === Sheet === */
+  .sheet-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.25);
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    z-index: 100; display: none; opacity: 0; transition: opacity 0.3s;
+  }
+  .sheet-overlay.open { display: block; opacity: 1; }
+  .sheet {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    max-width: 430px; margin: 0 auto;
+    background: var(--card);
+    border-radius: 20px 20px 0 0;
+    z-index: 101; transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    max-height: 60vh; overflow-y: auto;
+    padding: 0 20px 32px;
+    box-shadow: 0 -8px 32px rgba(0,0,0,0.1);
+  }
+  .sheet.open { transform: translateY(0); }
+  .sheet-handle { display: flex; justify-content: center; padding: 12px 0 16px; }
+  .sheet-handle-bar { width: 36px; height: 4px; border-radius: var(--radius-pill); background: var(--surface); }
+  .sheet-title {
+    font-family: 'ZeekrHeadline', sans-serif;
+    font-size: 16px; margin-bottom: 16px;
+  }
+  .sheet-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* === Bottom nav === */
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    max-width: 430px; margin: 0 auto;
+    background: var(--glass); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border-top: 1px solid var(--glass-border);
+    display: flex; z-index: 50;
+    padding: 6px 0 env(safe-area-inset-bottom, 8px);
+  }
+  .nav-item {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; gap: 3px;
+    padding: 6px 0; cursor: pointer; color: var(--text3);
+    font-size: 10px; font-weight: 500;
+    transition: color 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  .nav-item.active { color: var(--primary); }
+  .nav-item .nav-icon { height: 22px; display: flex; align-items: center; }
+
+  /* === Toast === */
+  .toast {
+    position: fixed; top: 16px; left: 50%;
+    transform: translateX(-50%) translateY(-80px);
+    background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    color: var(--text); border-radius: var(--radius); padding: 12px 22px;
+    font-size: 13px; font-weight: 500; z-index: 200;
+    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    box-shadow: var(--shadow-lg);
+    white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.ok { border-color: rgba(48,209,88,0.4); background: rgba(48,209,88,0.12); backdrop-filter: blur(20px); }
+  .toast.err { border-color: rgba(255,69,58,0.4); background: rgba(255,69,58,0.12); backdrop-filter: blur(20px); }
+
+  /* === Pages === */
+  .page { display: none; }
+  .page.active { display: block; }
+  .content-area { flex: 1; overflow-y: auto; padding-bottom: 70px; }
+
+  @keyframes shimmer { 0%,100% { opacity: 0.3; } 50% { opacity: 0.6; } }
+  .loading .soc-value { animation: shimmer 1.5s infinite; }
+
+  /* === Charging banner on frontpage === */
+  .charge-banner {
+    display: none; margin: 0 20px 8px;
+    background: linear-gradient(135deg, rgba(237,135,51,0.1), rgba(237,135,51,0.03));
+    border: 1px solid rgba(237,135,51,0.12);
+    border-radius: var(--radius); padding: 14px 16px;
+    cursor: pointer; transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    box-shadow: 0 2px 8px rgba(237,135,51,0.06);
+  }
+  .charge-banner:active { transform: scale(0.98); opacity: 0.85; }
+  .charge-banner.active { display: block; }
+  .cb-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .cb-title { font-size: 14px; font-weight: 500; color: var(--primary); display: flex; align-items: center; gap: 6px; }
+  .cb-power { font-family: 'RobotoNum', sans-serif; font-size: 14px; font-weight: 700; color: var(--primary); }
+  .cb-bar { height: 4px; background: var(--surface); border-radius: 2px; overflow: hidden; }
+  .cb-bar-fill { height: 100%; background: var(--primary); border-radius: 2px; transition: width 1s; }
+  .cb-bottom { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--text2); }
+
+  /* === Stats page === */
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 20px 12px; }
+  .stat-card {
+    background: var(--card-alt); border-radius: var(--radius); padding: 16px 14px;
+    display: flex; flex-direction: column; gap: 4px;
+    border: 1px solid rgba(0,0,0,0.02);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+  }
+  .stat-card .stat-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.6px; }
+  .stat-card .stat-val {
+    font-family: 'RobotoNum', 'Lynkcotype', sans-serif;
+    font-size: 22px; font-weight: 700; color: var(--text);
+  }
+  .stat-card .stat-unit { font-size: 11px; color: var(--text2); }
+  .stat-wide { grid-column: 1 / -1; }
+
+  /* Trip filter bar */
+  .trip-filter-bar { padding: 0 20px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .trip-filter-row { display: flex; align-items: center; gap: 8px; }
+  .trip-filter-select {
+    flex: 1; background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    border-radius: 10px; padding: 8px 12px; font-size: 13px; font-family: inherit;
+    -webkit-appearance: none; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center;
+  }
+  .trip-filter-btn {
+    background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    border-radius: 10px; padding: 8px 14px; font-size: 13px; font-family: inherit;
+    cursor: pointer; white-space: nowrap;
+  }
+  .trip-filter-btn:active { background: var(--card-alt); }
+  .trip-filter-date {
+    flex: 1; background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    border-radius: 10px; padding: 8px 12px; font-size: 13px; font-family: inherit;
+    color-scheme: dark;
+  }
+
+  .trip-item { background: var(--card-alt); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 6px; cursor: pointer; transition: all 0.2s; border: 1px solid rgba(0,0,0,0.02); box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
+  .trip-item:active { transform: scale(0.99); opacity: 0.85; }
+  .trip-row { display: flex; align-items: flex-start; gap: 10px; }
+  .trip-check { flex-shrink: 0; margin-top: 2px; width: 18px; height: 18px; accent-color: var(--accent); }
+  .trip-content { flex: 1; min-width: 0; }
+  .trip-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .trip-date { font-size: 13px; font-weight: 600; color: var(--text); }
+  .trip-time { font-size: 11px; color: var(--text3); }
+  .trip-location { font-size: 11px; color: var(--text3); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .trip-stats { display: flex; gap: 12px; flex-wrap: wrap; }
+  .trip-stat { font-size: 11px; color: var(--text2); }
+  .trip-stat b { color: var(--text); font-weight: 600; }
+  .trip-expand { display: none; margin-top: 10px; }
+  .trip-item.expanded .trip-expand { display: block; }
+  .trip-map { width: 100%; height: 200px; border-radius: 8px; background: var(--card-alt); }
+  .trip-chevron { font-size: 10px; color: var(--text3); transition: transform 0.2s; margin-left: 6px; }
+  .trip-item.expanded .trip-chevron { transform: rotate(90deg); }
+
+  /* === Climate presets === */
+  .preset-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 0 20px 20px; }
+  .preset-card {
+    background: var(--card-alt); border-radius: var(--radius); padding: 14px 10px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    cursor: pointer; transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    border: 1px solid rgba(0,0,0,0.02); text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  }
+  .preset-card:active { transform: scale(0.94); }
+  .preset-card.active {
+    border-color: rgba(48,209,88,0.3); background: rgba(48,209,88,0.08);
+    box-shadow: 0 2px 8px rgba(48,209,88,0.12);
+  }
+  .preset-card .preset-icon { color: var(--text2); }
+  .preset-card.active .preset-icon { color: var(--success); }
+  .preset-card .preset-name { font-size: 11px; font-weight: 500; color: var(--text2); }
+  .preset-card.active .preset-name { color: var(--success); }
+
+  /* Edit mode */
+  .edit-mode .qa-item, .edit-mode .ctrl-card { position: relative; }
+  .edit-remove {
+    position: absolute; top: -6px; right: -6px; z-index: 5;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--danger); color: #fff; border: none;
+    font-size: 12px; line-height: 20px; text-align: center;
+    cursor: pointer; display: none; padding: 0;
+  }
+  .edit-mode .edit-remove { display: block; }
+  .edit-add-card {
+    background: var(--card-alt); border: 2px dashed var(--text3); border-radius: var(--radius);
+    display: none; align-items: center; justify-content: center; gap: 6px;
+    cursor: pointer; min-height: 60px; color: var(--text3); font-size: 13px;
+    transition: all 0.15s;
+  }
+  .edit-mode .edit-add-card { display: flex; }
+  .edit-add-card:active { transform: scale(0.95); border-color: var(--primary); color: var(--primary); }
+  .edit-mode #edit-mode-btn { background: var(--primary-dim); color: var(--primary); }
+  .edit-mode .ctrl-card, .edit-mode .qa-item { cursor: grab; touch-action: none; }
+  .edit-mode .ctrl-card.dragging, .edit-mode .qa-item.dragging {
+    opacity: 0.4; transform: scale(0.95);
+  }
+  .edit-mode .ctrl-card.drag-over, .edit-mode .qa-item.drag-over {
+    border: 2px dashed var(--primary); border-radius: var(--radius);
+  }
+
+  /* Add-btn sheet items */
+  .add-btn-item {
+    display: flex; align-items: center; gap: 12px; padding: 12px 0;
+    border-bottom: 1px solid var(--divider); cursor: pointer; transition: background 0.1s;
+  }
+  .add-btn-item:last-child { border-bottom: none; }
+  .add-btn-item:active { opacity: 0.6; }
+  .add-btn-item .abi-icon {
+    width: 36px; height: 36px; border-radius: 50%; background: var(--card-alt);
+    display: flex; align-items: center; justify-content: center; color: var(--text2); flex-shrink: 0;
+  }
+  .add-btn-item .abi-label { font-size: 14px; color: var(--text); }
+
+  /* Fence list item */
+  .fence-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px 0;
+    border-bottom: 1px solid var(--divider);
+  }
+  .fence-item:last-child { border-bottom: none; }
+  .fence-info { flex: 1; min-width: 0; }
+  .fence-name { font-size: 13px; font-weight: 500; color: var(--text); }
+  .fence-detail { font-size: 11px; color: var(--text3); }
+
+</style>
+</head>
+<body class="loading">
+<div class="app">
+
+  <!-- ===== SVG ICON DEFS ===== -->
+  <svg style="display:none">
+    <defs>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+      <symbol id="i-unlock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></symbol>
+      <symbol id="i-snowflake" viewBox="0 0 24 24"><path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07"/></symbol>
+      <symbol id="i-trunk" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></symbol>
+      <symbol id="i-locate" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></symbol>
+      <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="none"/></symbol>
+      <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></symbol>
+      <symbol id="i-wind" viewBox="0 0 24 24"><path d="M9.59 4.59A2 2 0 1 1 11 8H2M12.59 19.41A2 2 0 1 0 14 16H2M17.73 7.73A2.5 2.5 0 1 1 19.5 12H2"/></symbol>
+      <symbol id="i-thermo" viewBox="0 0 24 24"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
+      <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 0 0 1 1h3m10-11l2 2m-2-2v10a1 1 0 0 1-1 1h-3m-4 0v-5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5m-4 0h4"/></symbol>
+      <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/><path d="M12 6v6l4 2"/></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+      <symbol id="i-car" viewBox="0 0 24 24"><path d="M5 17h14M5 17a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1l2-3h8l2 3h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2M5 17v2m14-2v2"/><circle cx="7.5" cy="13.5" r="1.5"/><circle cx="16.5" cy="13.5" r="1.5"/></symbol>
+      <symbol id="i-horn" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></symbol>
+      <symbol id="i-window" viewBox="0 0 24 24"><path d="M4 4h16v16H4z" fill="none"/><path d="M6 6h12v5H6z"/><path d="M6 13h12v5H6z" opacity=".3"/><path d="M12 14v4M9 16l3 2 3-2"/></symbol>
+      <symbol id="i-defrost" viewBox="0 0 24 24"><path d="M2 12h20M2 8h20M2 16h20"/><path d="M12 2v4M8 4v2M16 4v2M12 18v4M8 18v2M16 18v2"/></symbol>
+      <symbol id="i-seat" viewBox="0 0 24 24"><path d="M6 19v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M7 5h10v8a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V5z"/></symbol>
+      <symbol id="i-steering" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/><path d="M12 14v7M5.6 7.6l5.4 3.1M18.4 7.6l-5.4 3.1"/></symbol>
+      <symbol id="i-fan" viewBox="0 0 24 24"><path d="M12 12c-3 0-5-2.5-5-5s3-5 5-5c0 3 2.5 5 5 5s5 3 5 5c-3 0-5 2.5-5 5s-3 5-5 5c0-3-2.5-5-5-5s-5-3-5-5"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+      <symbol id="i-camera" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></symbol>
+      <symbol id="i-fence" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4" stroke-dasharray="3 2"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+      <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></symbol>
+    </defs>
+  </svg>
+
+  <!-- ===== PAGE 1: HOME ===== -->
+  <div class="page active" id="page-home">
+    <div class="titlebar">
+      <span style="display:flex;align-items:center;gap:6px"><span class="conn-dot" id="conn-dot"></span><span class="titlebar-name" id="topbar-model">ZEEKR X</span></span>
+      <div class="titlebar-right">
+        <span class="titlebar-sub" id="topbar-status"></span>
+        <button class="icon-btn" onclick="loadData()"><svg class="icon"><use href="#i-refresh"/></svg></button>
+        <button class="icon-btn" onclick="if(confirm('Uitloggen?'))fetch('/api/logout',{method:'POST',credentials:'same-origin'}).then(()=>window.location='/login')" title="Uitloggen"><svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg></button>
+      </div>
+    </div>
+
+    <div class="car-hero">
+      <div class="car-glow" id="car-glow"></div>
+      <div class="car-hero-body">
+        <div class="car-stack">
+          <img id="car-base" src="/static/hero_mist_grey.webp" alt="ZEEKR X">
+        </div>
+      </div>
+      <div class="soc-below">
+        <div class="soc-gauge-wrap">
+          <svg class="soc-gauge-svg" viewBox="0 0 200 110">
+            <path id="soc-arc-bg" class="soc-arc-bg" d="M 20 100 A 80 80 0 0 1 180 100"/>
+            <path id="soc-arc-fill" class="soc-arc-fill" d="M 20 100 A 80 80 0 0 1 180 100"
+              stroke-dasharray="251.3" stroke-dashoffset="251.3"/>
+          </svg>
+          <div class="soc-center">
+            <div class="soc-row">
+              <span class="soc-value" id="soc">--</span>
+              <span class="soc-pct">%</span>
+            </div>
+            <span class="soc-range" id="range">-- km bereik</span>
+          </div>
+        </div>
+        <div class="charge-badge" id="charge-badge">
+          <svg class="icon icon-sm" style="stroke:var(--primary)"><use href="#i-bolt"/></svg>
+          <span id="charge-power-badge">Laden...</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="main-card">
+      <div class="drag-handle"><div class="drag-handle-bar"></div></div>
+
+      <div class="qa-section">
+        <div class="qa-row" id="qa-row"></div>
+      </div>
+
+      <!-- Minimale voertuig status -->
+      <div id="home-vehicle-status" style="display:flex;align-items:center;justify-content:center;gap:12px;padding:6px 20px 10px;font-size:11px;color:var(--text3)" onclick="switchPage('stats')">
+        <span id="hvs-lock" style="display:flex;align-items:center;gap:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> <span id="hvs-lock-txt">--</span></span>
+        <span style="color:var(--divider)">|</span>
+        <span id="hvs-doors" style="display:flex;align-items:center;gap:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg> <span id="hvs-doors-txt">--</span></span>
+        <span style="color:var(--divider)">|</span>
+        <span id="hvs-windows" style="display:flex;align-items:center;gap:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="12"/></svg> <span id="hvs-win-txt">--</span></span>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <!-- Bediening -->
+      <div class="section-header" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Bediening</span>
+        <button class="icon-btn" id="edit-mode-btn" onclick="toggleEditMode()" style="width:28px;height:28px;background:transparent">
+          <svg class="icon icon-sm"><use href="#i-pencil"/></svg>
+        </button>
+      </div>
+      <div class="ctrl-grid" id="ctrl-grid"></div>
+
+      <div class="section-divider"></div>
+
+      <!-- Charging banner — visible when charging -->
+      <div class="charge-banner" id="charge-banner" onclick="switchPage('charge')">
+        <div class="cb-top">
+          <span class="cb-title"><svg class="icon icon-sm" style="stroke:var(--primary)"><use href="#i-bolt"/></svg> Laden</span>
+          <span class="cb-power" id="cb-power">-- kW</span>
+        </div>
+        <div class="cb-bar"><div class="cb-bar-fill" id="cb-bar-fill" style="width:0%"></div></div>
+        <div class="cb-bottom">
+          <span id="cb-soc">--% → --%</span>
+          <span id="cb-time">Nog ~-- min</span>
+        </div>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <div class="section-header">Voertuig</div>
+      <div class="detail-list">
+        <div class="detail-item"><span class="dl-label">Kilometerstand</span><span class="dl-value" id="d-odo">--</span></div>
+        <div class="detail-item"><span class="dl-label">Interieur</span><span class="dl-value" id="d-temp">--</span></div>
+        <div class="detail-item"><span class="dl-label">Laadlimiet</span><span class="dl-value" id="d-limit">--</span></div>
+        <div class="detail-item"><span class="dl-label">Verbruik</span><span class="dl-value" id="d-consumption">--</span></div>
+        <div class="detail-item"><span class="dl-label">Efficiëntie</span><span class="dl-value" id="d-consumption-kmkwh">--</span></div>
+        <div class="detail-item"><span class="dl-label">VIN</span><span class="dl-value" id="d-vin" style="font-size:11px;font-family:monospace;color:var(--text3)">--</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PAGE 2: KLIMAAT ===== -->
+  <div class="page" id="page-climate">
+    <div class="page-titlebar">
+      <span class="titlebar-name">Klimaat</span>
+      <button class="icon-btn" onclick="switchPage('home')"><svg class="icon"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="content-area" style="background:var(--card);">
+      <div class="climate-temp-display" style="text-align:center;padding:12px 0 4px;">
+        <div class="climate-temp-val" id="clim-temp">--°C</div>
+        <div class="climate-temp-label">Interieur</div>
+      </div>
+
+      <div class="section-header" style="padding-top:8px">Presets</div>
+      <div class="preset-grid" style="grid-template-columns:1fr 1fr">
+        <div class="preset-card" id="preset-preheat" onclick="togglePreheatConfig()">
+          <span class="preset-icon"><svg class="icon"><use href="#i-sun"/></svg></span>
+          <span class="preset-name">Voorverwarmen</span>
+        </div>
+        <div class="preset-card" id="preset-defrost" onclick="toggleDefrost()">
+          <span class="preset-icon"><svg class="icon"><use href="#i-defrost"/></svg></span>
+          <span class="preset-name">Ontdooien</span>
+        </div>
+      </div>
+
+      <!-- Schedule: Klimaat plannen -->
+      <div style="padding:0 20px 16px">
+        <div style="background:var(--card-alt);border-radius:var(--radius);padding:14px 16px">
+          <!-- Header + toggle -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <svg class="icon icon-sm" style="color:var(--text2)"><use href="#i-snowflake"/></svg>
+              <span style="font-size:13px;font-weight:500;color:var(--text)">Plannen</span>
+            </div>
+            <label class="mini-toggle">
+              <input type="checkbox" id="sched-climate-toggle" onchange="saveSchedule('climate')">
+              <div class="mt-track"><div class="mt-thumb"></div></div>
+            </label>
+          </div>
+          <!-- Tijd + herhaling -->
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+            <input type="time" id="sched-climate-time" value="07:00" onchange="saveSchedule('climate')"
+              style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit;color:var(--text);color-scheme:dark">
+            <select id="sched-climate-repeat" onchange="saveSchedule('climate')"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;font-family:inherit;color:var(--text2)">
+              <option value="daily">Dagelijks</option>
+              <option value="weekdays">Ma–Vr</option>
+              <option value="once">Eenmalig</option>
+            </select>
+          </div>
+          <!-- Modus tabs -->
+          <div style="display:flex;gap:6px;margin-bottom:12px">
+            <button class="ph-lvl-btn active" id="sc-mode-defrost" onclick="setSchedMode('defrost')" style="flex:1;padding:8px 0;font-size:12px">Ontdooien</button>
+            <button class="ph-lvl-btn" id="sc-mode-climate" onclick="setSchedMode('climate')" style="flex:1;padding:8px 0;font-size:12px">Verwarmen/Koelen</button>
+          </div>
+          <!-- Climate opties (alleen zichtbaar bij modus climate) -->
+          <div id="sched-climate-opts" style="display:none">
+            <!-- Temperatuur -->
+            <div style="margin-bottom:12px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <span style="font-size:12px;color:var(--text2)">Temperatuur</span>
+                <span style="font-size:12px;font-weight:600;color:var(--primary)" id="sc-temp-val">22°C</span>
+              </div>
+              <input type="range" class="zk-slider" id="sc-temp" min="16" max="30" step="1" value="22"
+                oninput="updateSliderFill(this);el('sc-temp-val').textContent=this.value+'°C';saveSchedule('climate')">
+            </div>
+            <!-- Duur -->
+            <div style="margin-bottom:12px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <span style="font-size:12px;color:var(--text2)">Duur</span>
+                <span style="font-size:12px;font-weight:600;color:var(--primary)" id="sc-dur-val">15 min</span>
+              </div>
+              <input type="range" class="zk-slider" id="sc-dur" min="1" max="60" step="1" value="15"
+                oninput="updateSliderFill(this);el('sc-dur-val').textContent=this.value+' min';saveSchedule('climate')">
+            </div>
+            <!-- Stoelverwarming bestuurder -->
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:8px">
+              <span>Stoel warm. best.</span>
+              <div style="display:flex;gap:4px">
+                <button class="ph-lvl-btn active" onclick="setScLevel('sc-seat-heat-driver',0,this)">Uit</button>
+                <button class="ph-lvl-btn" onclick="setScLevel('sc-seat-heat-driver',1,this)">Laag</button>
+                <button class="ph-lvl-btn" onclick="setScLevel('sc-seat-heat-driver',2,this)">Mid</button>
+                <button class="ph-lvl-btn" onclick="setScLevel('sc-seat-heat-driver',3,this)">Hoog</button>
+              </div>
+              <input type="hidden" id="sc-seat-heat-driver" value="0">
+            </div>
+            <!-- Stoelverwarming passagier -->
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:8px">
+              <span>Stoel warm. pass.</span>
+              <div style="display:flex;gap:4px">
+                <button class="ph-lvl-btn active" onclick="setScLevel('sc-seat-heat-passenger',0,this)">Uit</button>
+                <button class="ph-lvl-btn" onclick="setScLevel('sc-seat-heat-passenger',1,this)">Laag</button>
+                <button class="ph-lvl-btn" onclick="setScLevel('sc-seat-heat-passenger',2,this)">Mid</button>
+                <button class="ph-lvl-btn" onclick="setScLevel('sc-seat-heat-passenger',3,this)">Hoog</button>
+              </div>
+              <input type="hidden" id="sc-seat-heat-passenger" value="0">
+            </div>
+            <!-- Stoelventilatie bestuurder -->
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:8px">
+              <span>Stoel vent. best.</span>
+              <div style="display:flex;gap:4px">
+                <button class="ph-lvl-btn active" onclick="setScLevel('sc-seat-vent-driver',0,this)">Uit</button>
+                <button class="ph-lvl-btn" onclick="setScLevel('sc-seat-vent-driver',1,this)">Laag</button>
+                <button class="ph-lvl-btn" onclick="setScLevel('sc-seat-vent-driver',2,this)">Mid</button>
+                <button class="ph-lvl-btn" onclick="setScLevel('sc-seat-vent-driver',3,this)">Hoog</button>
+              </div>
+              <input type="hidden" id="sc-seat-vent-driver" value="0">
+            </div>
+            <!-- Stoelventilatie passagier -->
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:8px">
+              <span>Stoel vent. pass.</span>
+              <div style="display:flex;gap:4px">
+                <button class="ph-lvl-btn active" onclick="setScLevel('sc-seat-vent-passenger',0,this)">Uit</button>
+                <button class="ph-lvl-btn" onclick="setScLevel('sc-seat-vent-passenger',1,this)">Laag</button>
+                <button class="ph-lvl-btn" onclick="setScLevel('sc-seat-vent-passenger',2,this)">Mid</button>
+                <button class="ph-lvl-btn" onclick="setScLevel('sc-seat-vent-passenger',3,this)">Hoog</button>
+              </div>
+              <input type="hidden" id="sc-seat-vent-passenger" value="0">
+            </div>
+            <!-- Stuurverwarming -->
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text2)">
+              <span>Stuurverwarming</span>
+              <div style="display:flex;gap:4px">
+                <button class="ph-lvl-btn active" onclick="setScLevel('sc-steering-heat',0,this)">Uit</button>
+                <button class="ph-lvl-btn" onclick="setScLevel('sc-steering-heat',1,this)">Laag</button>
+                <button class="ph-lvl-btn" onclick="setScLevel('sc-steering-heat',2,this)">Mid</button>
+                <button class="ph-lvl-btn" onclick="setScLevel('sc-steering-heat',3,this)">Hoog</button>
+              </div>
+              <input type="hidden" id="sc-steering-heat" value="0">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Voorverwarmen configuratie -->
+      <div id="preheat-config" style="display:none;padding:0 20px 16px;">
+        <div style="background:var(--card-alt);border-radius:var(--radius);padding:16px;border:1px solid var(--primary);margin-bottom:8px">
+          <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:12px">Voorverwarmen instellingen</div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
+            <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text2);cursor:pointer">
+              <input type="checkbox" id="ph-cabin" checked style="accent-color:var(--primary);width:18px;height:18px"> Cabine verwarmen
+            </label>
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--text2)">
+              <span>Stoelverwarming bestuurder</span>
+              <div class="ph-level-btns" style="display:flex;gap:4px">
+                <button class="ph-lvl-btn active" onclick="setPhLevel('ph-seat-driver',0,this)">Uit</button>
+                <button class="ph-lvl-btn" onclick="setPhLevel('ph-seat-driver',1,this)">Laag</button>
+                <button class="ph-lvl-btn" onclick="setPhLevel('ph-seat-driver',2,this)">Mid</button>
+                <button class="ph-lvl-btn" onclick="setPhLevel('ph-seat-driver',3,this)">Hoog</button>
+              </div>
+              <input type="hidden" id="ph-seat-driver" value="0">
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--text2)">
+              <span>Stoelverwarming passagier</span>
+              <div class="ph-level-btns" style="display:flex;gap:4px">
+                <button class="ph-lvl-btn active" onclick="setPhLevel('ph-seat-passenger',0,this)">Uit</button>
+                <button class="ph-lvl-btn" onclick="setPhLevel('ph-seat-passenger',1,this)">Laag</button>
+                <button class="ph-lvl-btn" onclick="setPhLevel('ph-seat-passenger',2,this)">Mid</button>
+                <button class="ph-lvl-btn" onclick="setPhLevel('ph-seat-passenger',3,this)">Hoog</button>
+              </div>
+              <input type="hidden" id="ph-seat-passenger" value="0">
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--text2)">
+              <span>Stuurverwarming</span>
+              <div class="ph-level-btns" style="display:flex;gap:4px">
+                <button class="ph-lvl-btn active" onclick="setPhLevel('ph-steering',0,this)">Uit</button>
+                <button class="ph-lvl-btn" onclick="setPhLevel('ph-steering',1,this)">Laag</button>
+                <button class="ph-lvl-btn" onclick="setPhLevel('ph-steering',2,this)">Mid</button>
+                <button class="ph-lvl-btn" onclick="setPhLevel('ph-steering',3,this)">Hoog</button>
+              </div>
+              <input type="hidden" id="ph-steering" value="0">
+            </div>
+            <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text2);cursor:pointer">
+              <input type="checkbox" id="ph-rear-defrost" style="accent-color:var(--primary);width:18px;height:18px"> Ontdooien achterruit & spiegels
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text2);cursor:pointer">
+              <input type="checkbox" id="ph-battery" style="accent-color:var(--primary);width:18px;height:18px"> Battery pre-conditioning
+            </label>
+          </div>
+          <div style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <span style="font-size:13px;color:var(--text2)">Temperatuur</span>
+              <span style="font-size:13px;font-weight:600;color:var(--primary)" id="ph-temp-val">20°C</span>
+            </div>
+            <input type="range" class="zk-slider" id="ph-temp" min="18" max="28" step="1" value="20" oninput="updateSliderFill(this);el('ph-temp-val').textContent=this.value+'°C'">
+          </div>
+          <div style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <span style="font-size:13px;color:var(--text2)">Duur</span>
+              <span style="font-size:13px;font-weight:600;color:var(--primary)" id="ph-dur-val">15 min</span>
+            </div>
+            <input type="range" class="zk-slider" id="ph-dur" min="1" max="60" step="1" value="15" oninput="updateSliderFill(this);el('ph-dur-val').textContent=this.value+' min'">
+          </div>
+          <div class="toggle-row" style="padding:0;border:none">
+            <div>
+              <span class="toggle-label">Voorverwarmen</span>
+              <span class="toggle-status" id="preheat-status">Uit</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="preheat-toggle" onchange="togglePreheatAction(this.checked)">
+              <div class="toggle-track"><div class="toggle-thumb"></div></div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Klimaat master toggle -->
+      <div class="climate-quick" style="flex-direction:column;gap:0">
+        <div class="toggle-row">
+          <div>
+            <span class="toggle-label">Verwarmen / Koelen</span>
+            <span class="toggle-status" id="heat-status">Uit</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="heat-toggle">
+            <div class="toggle-track"><div class="toggle-thumb"></div></div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Temperatuur — geen toggle -->
+      <div class="slider-group">
+        <div class="slider-header"><span class="slider-title">Temperatuur</span><span class="slider-val" id="lbl-temp">20.0°C</span></div>
+        <input type="range" class="zk-slider" id="slider-temp" min="16" max="30" step="0.5" value="20" oninput="updateSliderFill(this);el('lbl-temp').textContent=parseFloat(this.value).toFixed(1)+'°C'">
+        <div class="slider-ticks"><span>16°</span><span>22°</span><span>30°</span></div>
+      </div>
+
+      <!-- Ventilator — knoppen -->
+      <div style="padding:0 20px;margin-bottom:4px"><span style="font-size:12px;font-weight:500;color:var(--text2)">Ventilator</span></div>
+      <div class="level-btns" id="fan-btns">
+        <button class="level-btn active" onclick="setFan(0)">Auto</button>
+        <button class="level-btn" onclick="setFan(1)">1</button>
+        <button class="level-btn" onclick="setFan(2)">2</button>
+        <button class="level-btn" onclick="setFan(3)">3</button>
+        <button class="level-btn" onclick="setFan(4)">4</button>
+        <button class="level-btn" onclick="setFan(5)">5</button>
+        <button class="level-btn" onclick="setFan(6)">6</button>
+        <button class="level-btn" onclick="setFan(7)">7</button>
+      </div>
+
+      <!-- Stoelverwarming bestuurder -->
+      <div style="padding:0 20px;margin-bottom:4px"><span style="font-size:12px;font-weight:500;color:var(--text2)">Stoelverwarming bestuurder</span></div>
+      <div class="level-btns" id="seat-heat-fl-btns">
+        <button class="level-btn active" onclick="setLevel('seat-heat-fl',0)">Uit</button>
+        <button class="level-btn" onclick="setLevel('seat-heat-fl',1)">Laag</button>
+        <button class="level-btn" onclick="setLevel('seat-heat-fl',2)">Mid</button>
+        <button class="level-btn" onclick="setLevel('seat-heat-fl',3)">Hoog</button>
+      </div>
+
+      <!-- Stoelverwarming passagier -->
+      <div style="padding:0 20px;margin-bottom:4px"><span style="font-size:12px;font-weight:500;color:var(--text2)">Stoelverwarming passagier</span></div>
+      <div class="level-btns" id="seat-heat-fr-btns">
+        <button class="level-btn active" onclick="setLevel('seat-heat-fr',0)">Uit</button>
+        <button class="level-btn" onclick="setLevel('seat-heat-fr',1)">Laag</button>
+        <button class="level-btn" onclick="setLevel('seat-heat-fr',2)">Mid</button>
+        <button class="level-btn" onclick="setLevel('seat-heat-fr',3)">Hoog</button>
+      </div>
+
+      <!-- Ventilatie bestuurder -->
+      <div style="padding:0 20px;margin-bottom:4px"><span style="font-size:12px;font-weight:500;color:var(--text2)">Ventilatie bestuurder</span></div>
+      <div class="level-btns" id="seat-vent-fl-btns">
+        <button class="level-btn active" onclick="setLevel('seat-vent-fl',0)">Uit</button>
+        <button class="level-btn" onclick="setLevel('seat-vent-fl',1)">Laag</button>
+        <button class="level-btn" onclick="setLevel('seat-vent-fl',2)">Mid</button>
+        <button class="level-btn" onclick="setLevel('seat-vent-fl',3)">Hoog</button>
+      </div>
+
+      <!-- Ventilatie passagier -->
+      <div style="padding:0 20px;margin-bottom:4px"><span style="font-size:12px;font-weight:500;color:var(--text2)">Ventilatie passagier</span></div>
+      <div class="level-btns" id="seat-vent-fr-btns">
+        <button class="level-btn active" onclick="setLevel('seat-vent-fr',0)">Uit</button>
+        <button class="level-btn" onclick="setLevel('seat-vent-fr',1)">Laag</button>
+        <button class="level-btn" onclick="setLevel('seat-vent-fr',2)">Mid</button>
+        <button class="level-btn" onclick="setLevel('seat-vent-fr',3)">Hoog</button>
+      </div>
+
+      <!-- Stuurverwarming -->
+      <div style="padding:0 20px;margin-bottom:4px"><span style="font-size:12px;font-weight:500;color:var(--text2)">Stuurverwarming</span></div>
+      <div class="level-btns" id="steer-btns">
+        <button class="level-btn active" onclick="setLevel('steer',0)">Uit</button>
+        <button class="level-btn" onclick="setLevel('steer',1)">Laag</button>
+        <button class="level-btn" onclick="setLevel('steer',2)">Mid</button>
+        <button class="level-btn" onclick="setLevel('steer',3)">Hoog</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== PAGE 3: LADEN ===== -->
+  <div class="page" id="page-charge">
+    <div class="page-titlebar">
+      <span class="titlebar-name">Laden</span>
+      <button class="icon-btn" onclick="switchPage('home')"><svg class="icon"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="content-area" style="background:var(--card);">
+      <!-- SOC Gauge (zelfde als homepage) -->
+      <div class="soc-below" style="margin-top:0">
+        <div class="soc-gauge-wrap">
+          <svg class="soc-gauge-svg" viewBox="0 0 200 110">
+            <path class="soc-arc-bg" d="M 20 100 A 80 80 0 0 1 180 100"/>
+            <path class="soc-arc-fill" id="charge-arc-fill" d="M 20 100 A 80 80 0 0 1 180 100"
+              stroke-dasharray="251.3" stroke-dashoffset="251.3"/>
+          </svg>
+          <div class="soc-center">
+            <div class="soc-row">
+              <span class="soc-value" id="charge-gauge-val">--</span>
+              <span class="soc-pct">%</span>
+            </div>
+            <span class="soc-range" id="charge-gauge-status">Niet aangesloten</span>
+          </div>
+        </div>
+        <span class="soc-range" id="charge-gauge-range">-- km bereik</span>
+      </div>
+      <!-- Stats row -->
+      <div class="charge-stats">
+        <div class="charge-stat"><div class="cs-label">Vermogen</div><div><span class="cs-value" id="cs-power">--</span><span class="cs-unit">kW</span></div></div>
+        <div class="charge-stat"><div class="cs-label">Spanning</div><div><span class="cs-value" id="cs-voltage">--</span><span class="cs-unit">V</span></div></div>
+        <div class="charge-stat"><div class="cs-label">Stroom</div><div><span class="cs-value" id="cs-current">--</span><span class="cs-unit">A</span></div></div>
+        <div class="charge-stat"><div class="cs-label">Tijd</div><div><span class="cs-value" id="cs-time">--</span><span class="cs-unit">min</span></div></div>
+      </div>
+      <!-- Actions -->
+      <div class="ctrl-grid" style="padding-bottom:16px">
+        <div class="ctrl-card" onclick="ctrl('start_charge')">
+          <div class="ctrl-icon"><svg class="icon"><use href="#i-bolt"/></svg></div>
+          <span class="ctrl-name">Start laden</span>
+        </div>
+        <div class="ctrl-card" onclick="ctrl('stop_charge')">
+          <div class="ctrl-icon" style="color:var(--danger)"><svg class="icon" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></div>
+          <span class="ctrl-name">Stop laden</span>
+        </div>
+      </div>
+      <div style="padding:0 20px 8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <span style="font-size:12px;color:var(--text2)">Laadlimiet</span>
+          <span style="font-size:14px;font-weight:600;color:var(--text)" id="lbl-charge-limit">80%</span>
+        </div>
+        <input type="range" class="zk-slider" id="slider-charge-limit" min="50" max="100" step="1" value="80"
+          style="width:100%" oninput="updateSliderFill(this);el('lbl-charge-limit').textContent=this.value+'%'">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:2px"><span>50%</span><span>100%</span></div>
+      </div>
+
+      <!-- Schedule: Laden plannen -->
+      <div style="padding:0 20px 16px">
+        <div style="background:var(--card-alt);border-radius:var(--radius);padding:14px 16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <svg class="icon icon-sm" style="color:var(--text2)"><use href="#i-bolt"/></svg>
+              <span style="font-size:13px;font-weight:500;color:var(--text)">Laden plannen</span>
+            </div>
+            <label class="mini-toggle">
+              <input type="checkbox" id="sched-charge-toggle" onchange="saveSchedule('charge')">
+              <div class="mt-track"><div class="mt-thumb"></div></div>
+            </label>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:4px;flex:1;min-width:0">
+              <span style="font-size:11px;color:var(--text3);white-space:nowrap">Van</span>
+              <input type="time" id="sched-charge-from" value="23:00" onchange="saveSchedule('charge')"
+                style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit;color:var(--text);color-scheme:dark">
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;flex:1;min-width:0">
+              <span style="font-size:11px;color:var(--text3);white-space:nowrap">Tot</span>
+              <input type="time" id="sched-charge-to" value="07:00" onchange="saveSchedule('charge')"
+                style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit;color:var(--text);color-scheme:dark">
+            </div>
+            <select id="sched-charge-repeat" onchange="saveSchedule('charge')"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;font-family:inherit;color:var(--text2)">
+              <option value="daily">Dagelijks</option>
+              <option value="weekdays">Ma–Vr</option>
+              <option value="once">Eenmalig</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-header">Details</div>
+      <div class="detail-list">
+        <div class="detail-item"><span class="dl-label">Laadsnelheid</span><span class="dl-value" id="cd-speed">--</span></div>
+        <div class="detail-item"><span class="dl-label">Laadklep</span><span class="dl-value" id="cd-lid">--</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PAGE 4: STATUS (samenvoeging stats + status) ===== -->
+  <div class="page" id="page-stats">
+    <div class="page-titlebar">
+      <span class="titlebar-name">Status</span>
+      <button class="icon-btn" onclick="switchPage('home')"><svg class="icon"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="content-area" style="background:var(--card);">
+
+      <!-- Verbruik stats -->
+      <div class="section-header">Verbruik</div>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <span class="stat-label">Gem. verbruik</span>
+          <div><span class="stat-val" id="st-consumption">--</span><span class="stat-unit"> kWh/100km</span></div>
+          <div style="margin-top:2px"><span class="stat-val" id="st-consumption-kmkwh" style="font-size:16px;color:var(--text2)">--</span><span class="stat-unit"> km/kWh</span></div>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Bereik</span>
+          <div><span class="stat-val" id="st-range">--</span><span class="stat-unit"> km</span></div>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Accuniveau</span>
+          <div><span class="stat-val" id="st-soc">--</span><span class="stat-unit"> %</span></div>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Kilometerstand</span>
+          <div><span class="stat-val" id="st-odo">--</span><span class="stat-unit"> km</span></div>
+        </div>
+      </div>
+
+      <!-- Vehicle visual with toggle -->
+      <div class="vv-tabs">
+        <button class="vv-tab active" id="vv-tab-tyres" onclick="switchVehicleView('tyres')">Banden</button>
+        <button class="vv-tab" id="vv-tab-doors" onclick="switchVehicleView('doors')">Deuren &amp; Ramen</button>
+      </div>
+      <div class="vehicle-wrap">
+        <img class="vehicle-photo" src="/static/car_top_sm.webp" alt="Zeekr X bovenaanzicht">
+        <!-- Banden layer -->
+        <div class="vv-layer" id="vv-tyres">
+          <div class="tp tp-fl" id="tp-fl"><span class="tp-bar" id="tyre-fl-val">--</span><span class="tp-temp" id="tyre-fl-temp">--°C</span></div>
+          <div class="tp tp-fr" id="tp-fr"><span class="tp-bar" id="tyre-fr-val">--</span><span class="tp-temp" id="tyre-fr-temp">--°C</span></div>
+          <div class="tp tp-rl" id="tp-rl"><span class="tp-bar" id="tyre-rl-val">--</span><span class="tp-temp" id="tyre-rl-temp">--°C</span></div>
+          <div class="tp tp-rr" id="tp-rr"><span class="tp-bar" id="tyre-rr-val">--</span><span class="tp-temp" id="tyre-rr-temp">--°C</span></div>
+        </div>
+        <!-- Deuren layer -->
+        <div class="vv-layer hidden" id="vv-doors">
+          <div class="dd closed dd-fl" id="dr-fl"><span class="dd-dot"></span><span class="dd-label">LV</span></div>
+          <div class="dd closed dd-fr" id="dr-fr"><span class="dd-dot"></span><span class="dd-label">RV</span></div>
+          <div class="dd closed dd-rl" id="dr-rl"><span class="dd-dot"></span><span class="dd-label">LA</span></div>
+          <div class="dd closed dd-rr" id="dr-rr"><span class="dd-dot"></span><span class="dd-label">RA</span></div>
+          <div class="dd closed dd-trunk" id="dr-trunk"><span class="dd-dot"></span><span class="dd-label">Klep</span></div>
+          <div class="dd closed dd-hood" id="dr-hood"><span class="dd-dot"></span><span class="dd-label">Frunk</span></div>
+          <div class="wbar closed wbar-fl" id="wl-fl"></div>
+          <div class="wbar closed wbar-fr" id="wl-fr"></div>
+          <div class="wbar closed wbar-rl" id="wl-rl"></div>
+          <div class="wbar closed wbar-rr" id="wl-rr"></div>
+        </div>
+      </div>
+      <div id="lock-pill" class="lock-status locked" style="display:none">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        <span id="lock-text">Vergrendeld</span>
+      </div>
+
+      <!-- Accu & Service -->
+      <div class="section-header">Accu &amp; Service</div>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <span class="stat-label">Laadlimiet</span>
+          <div><span class="stat-val" id="st-limit">--</span><span class="stat-unit"> %</span></div>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">12V Accu</span>
+          <div><span class="stat-val" id="st-12v">--</span><span class="stat-unit"> V</span></div>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Volgende service</span>
+          <div><span class="stat-val" id="st-service-km">--</span><span class="stat-unit"> km</span></div>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Dagen tot service</span>
+          <div><span class="stat-val" id="st-service-days">--</span><span class="stat-unit"> dagen</span></div>
+        </div>
+      </div>
+
+      <!-- Details -->
+      <div class="section-header">Voertuig</div>
+      <div class="detail-list">
+        <div class="detail-item"><span class="dl-label">Interieur temp.</span><span class="dl-value" id="st-temp">--</span></div>
+        <div class="detail-item"><span class="dl-label">PM2.5</span><span class="dl-value" id="st-pm25">-- <small style="color:var(--text3)">µg/m³</small></span></div>
+        <div class="detail-item"><span class="dl-label">Kenteken</span><span class="dl-value" id="st-plate">--</span></div>
+        <div class="detail-item"><span class="dl-label">VIN</span><span class="dl-value" id="st-vin" style="font-size:11px;font-family:monospace;color:var(--text3)">--</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== PAGE 5: LOCATIE & RITTEN ===== -->
+  <div class="page" id="page-location">
+    <div class="page-titlebar">
+      <span class="titlebar-name">Locatie</span>
+      <button class="icon-btn" onclick="switchPage('home')"><svg class="icon"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="content-area" style="background:var(--card);">
+      <div class="home-map-section" style="padding:16px 20px">
+        <div class="home-map-wrap" id="home-map-wrap" style="height:220px"></div>
+        <div class="home-map-address" id="home-map-addr">
+          <svg class="icon icon-sm" style="color:var(--primary)"><use href="#i-locate"/></svg>
+          <span class="map-addr-text" id="home-map-addr-text">Locatie laden...</span>
+        </div>
+        <div class="home-map-time" id="home-map-time"></div>
+        <button class="btn-navigate" id="btn-navigate" onclick="openNavigation()" style="display:none">
+          <svg class="icon icon-sm" viewBox="0 0 24 24" style="fill:none;stroke:currentColor"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
+          Navigeer naar auto
+        </button>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <!-- Geofencing -->
+      <div class="section-header">Geofences</div>
+      <div id="fence-list" style="padding:0 20px 8px">
+        <div style="color:var(--text3);font-size:12px;text-align:center;padding:8px 0">Laden...</div>
+      </div>
+      <div style="padding:0 20px 16px">
+        <button class="pill-btn primary" onclick="openSheet('add-fence')" style="width:100%">
+          <svg class="icon icon-sm" style="vertical-align:-3px"><use href="#i-plus"/></svg> Zone toevoegen
+        </button>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <div class="section-header">Reisgeschiedenis</div>
+      <div class="trip-filter-bar">
+        <div class="trip-filter-row">
+          <select id="trip-days" class="trip-filter-select" onchange="onTripFilterChange()">
+            <option value="7" selected>7 dagen</option>
+            <option value="30">30 dagen</option>
+            <option value="90">90 dagen</option>
+            <option value="0">Alles</option>
+            <option value="custom">Periode...</option>
+          </select>
+          <button class="trip-filter-btn" onclick="downloadTripsCSV()" title="Download CSV">⬇ CSV</button>
+        </div>
+        <div class="trip-filter-row" id="trip-date-range" style="display:none">
+          <input type="date" id="trip-date-from" class="trip-filter-date" onchange="loadTrips()" title="Van datum">
+          <span style="color:var(--text3);font-size:12px">–</span>
+          <input type="date" id="trip-date-to" class="trip-filter-date" onchange="loadTrips()" title="Tot datum">
+        </div>
+      </div>
+      <div id="trip-list" style="padding:0 20px 20px">
+        <div style="color:var(--text3);font-size:12px;text-align:center;padding:16px 0">Laden...</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== SHEETS ===== -->
+  <div class="sheet-overlay" id="overlay" onclick="closeSheet()"></div>
+  <div class="sheet" id="sheet-lights">
+    <div class="sheet-handle"><div class="sheet-handle-bar"></div></div>
+    <div class="sheet-title">Licht &amp; Geluid</div>
+    <div class="sheet-actions">
+      <button class="pill-btn" onclick="ctrl('flash')">Lichten</button>
+      <button class="pill-btn" onclick="ctrl('horn')">Claxon</button>
+    </div>
+  </div>
+
+  <!-- Geofence toevoegen sheet -->
+  <div class="sheet" id="sheet-add-fence">
+    <div class="sheet-handle"><div class="sheet-handle-bar"></div></div>
+    <div class="sheet-title">Zone toevoegen</div>
+    <div style="padding:0 20px 20px;display:flex;flex-direction:column;gap:12px">
+      <div>
+        <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Naam</label>
+        <input type="text" id="fence-name" value="Thuis" placeholder="Zone naam"
+          style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;font-family:inherit;color:var(--text)">
+      </div>
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <label style="font-size:12px;color:var(--text2)">Radius</label>
+          <span style="font-size:12px;font-weight:600;color:var(--primary)" id="lbl-fence-radius">500m</span>
+        </div>
+        <input type="range" class="zk-slider" id="fence-radius" min="100" max="2000" step="50" value="500"
+          style="width:100%" oninput="updateSliderFill(this);el('lbl-fence-radius').textContent=this.value+'m'">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:2px"><span>100m</span><span>2km</span></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);cursor:pointer;flex:1">
+          <input type="checkbox" id="fence-enter" checked style="accent-color:var(--primary);width:16px;height:16px"> Bij binnenkomst
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);cursor:pointer;flex:1">
+          <input type="checkbox" id="fence-exit" checked style="accent-color:var(--primary);width:16px;height:16px"> Bij vertrek
+        </label>
+      </div>
+      <div style="font-size:11px;color:var(--text3);text-align:center" id="fence-location-info">Gebruikt huidige locatie auto</div>
+      <button class="pill-btn primary" onclick="createFence()" style="width:100%">Aanmaken</button>
+    </div>
+  </div>
+
+  <!-- Homescreen knop toevoegen sheet -->
+  <div class="sheet" id="sheet-add-btn">
+    <div class="sheet-handle"><div class="sheet-handle-bar"></div></div>
+    <div class="sheet-title">Knop toevoegen</div>
+    <div id="add-btn-list" style="padding:0 20px 20px"></div>
+  </div>
+
+  <!-- ===== BOTTOM NAV ===== -->
+  <div class="bottom-nav">
+    <div class="nav-item active" id="nav-home" onclick="switchPage('home')">
+      <span class="nav-icon"><svg class="icon"><use href="#i-home"/></svg></span><span>Home</span>
+    </div>
+    <div class="nav-item" id="nav-climate" onclick="switchPage('climate')">
+      <span class="nav-icon"><svg class="icon"><use href="#i-snowflake"/></svg></span><span>Klimaat</span>
+    </div>
+    <div class="nav-item" id="nav-charge" onclick="switchPage('charge')">
+      <span class="nav-icon"><svg class="icon"><use href="#i-bolt"/></svg></span><span>Laden</span>
+    </div>
+    <div class="nav-item" id="nav-stats" onclick="switchPage('stats')">
+      <span class="nav-icon"><svg class="icon"><use href="#i-car"/></svg></span><span>Status</span>
+    </div>
+    <div class="nav-item" id="nav-location" onclick="switchPage('location')">
+      <span class="nav-icon"><svg class="icon"><use href="#i-locate"/></svg></span><span>Locatie</span>
+    </div>
+  </div>
+
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+let state = {};
+const el = id => document.getElementById(id);
+const HL = ['Uit','Laag','Mid','Hoog'];
+const FL = ['Auto','1','2','3','4','5','6','7'];
+function escHtml(s) { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; }
+
+function updateSliderFill(s) {
+  const p = ((s.value - s.min) / (s.max - s.min)) * 100;
+  s.style.background = `linear-gradient(to right, var(--primary) ${p}%, var(--surface) ${p}%)`;
+}
+function debounce(fn, ms) { let t; return function(...a) { clearTimeout(t); t = setTimeout(() => fn.apply(this, a), ms); }; }
+
+function initSliders() {
+  document.querySelectorAll('.zk-slider').forEach(s => {
+    updateSliderFill(s);
+    // Block tap-on-track: only dragging the thumb changes the value
+    s._dragging = false;
+    s._savedVal = s.value;
+    s.addEventListener('pointerdown', () => {
+      s._savedVal = s.value;
+      s._dragging = false;
+    }, true);
+    s.addEventListener('pointermove', e => {
+      if (e.pressure > 0) s._dragging = true;
+    });
+    s.addEventListener('input', e => {
+      if (!s._dragging) {
+        e.stopImmediatePropagation();
+        s.value = s._savedVal;
+        updateSliderFill(s);
+      }
+    });
+    s.addEventListener('pointerup', () => { s._dragging = false; });
+  });
+}
+
+// Sliders NEVER activate — only mini-toggles and buttons send commands
+function sendSetting(cmd, params, active) {
+  _climateOverrideUntil = Date.now() + 15000; // 15s cooldown
+  if (active) {
+    ctrl(cmd, params);
+  } else {
+    // Toggle off: send with level 0
+    const offParams = {};
+    for (const k of Object.keys(params)) offParams[k] = 0;
+    ctrl(cmd, offParams);
+  }
+}
+
+// === Level button helpers ===
+let _levelValues = { 'seat-heat-fl': 0, 'seat-heat-fr': 0, 'seat-vent-fl': 0, 'seat-vent-fr': 0, 'steer': 0 };
+let _fanLevel = 0;
+
+function selectBtn(containerId, idx) {
+  const btns = el(containerId).querySelectorAll('.level-btn');
+  btns.forEach((b, i) => b.classList.toggle('active', i === idx));
+}
+
+function setLevel(name, level) {
+  _levelValues[name] = level;
+  selectBtn(name + '-btns', level);
+  _climateOverrideUntil = Date.now() + 15000;
+  const cmdMap = {
+    'seat-heat-fl': () => ctrl('seat_heating', { seat_fl: _levelValues['seat-heat-fl'], seat_fr: _levelValues['seat-heat-fr'] }),
+    'seat-heat-fr': () => ctrl('seat_heating', { seat_fl: _levelValues['seat-heat-fl'], seat_fr: _levelValues['seat-heat-fr'] }),
+    'seat-vent-fl': () => ctrl('seat_ventilation', { seat_fl: _levelValues['seat-vent-fl'], seat_fr: _levelValues['seat-vent-fr'] }),
+    'seat-vent-fr': () => ctrl('seat_ventilation', { seat_fl: _levelValues['seat-vent-fl'], seat_fr: _levelValues['seat-vent-fr'] }),
+    'steer': () => ctrl('steering_heating', { level: _levelValues['steer'] }),
+  };
+  cmdMap[name]();
+}
+
+function setFan(level) {
+  _fanLevel = level;
+  selectBtn('fan-btns', level);
+  ctrl('fan_speed', { level: level });
+}
+
+function switchPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  (el('page-'+name)||{}).classList?.add('active');
+  (el('nav-'+name)||{}).classList?.add('active');
+  if (name === 'stats') loadTrips();
+  if (name === 'location') {
+    loadTrips();
+    loadLocation();
+    if (homeMap) setTimeout(() => homeMap.invalidateSize(), 200);
+  }
+}
+function openSheet(name) {
+  closeSheet();
+  el('overlay').classList.add('open');
+  const s = el('sheet-'+name);
+  if (s) setTimeout(() => s.classList.add('open'), 10);
+}
+function closeSheet() {
+  el('overlay').classList.remove('open');
+  document.querySelectorAll('.sheet').forEach(s => s.classList.remove('open'));
+}
+function toggleCtrl(id) {
+  const c = el(id);
+  if (c.classList.contains('expanded')) { c.classList.remove('expanded'); }
+  else { document.querySelectorAll('.ctrl-card.expanded').forEach(x => x.classList.remove('expanded')); c.classList.add('expanded'); }
+}
+function showToast(msg, ok) {
+  const t = el('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (ok ? 'ok' : 'err');
+  setTimeout(() => { t.className = 'toast'; }, 2500);
+}
+function socColor(p) { return p >= 40 ? 'var(--success)' : p >= 20 ? 'var(--primary)' : 'var(--danger)'; }
+function tc(id, cls, on) { const e = el(id); if(e) { if(on) e.classList.add(cls); else e.classList.remove(cls); } }
+
+
+function updateCarImage(p) {
+  const g = el('car-glow');
+  if (p.is_charging && p.is_plugged) {
+    g.className='car-glow charging';
+  } else {
+    g.className='car-glow';
+  }
+}
+
+const SOC_ARC_LEN = 251.3; // half-circle arc length for r=80
+function updateSOC(p) {
+  if (p.soc != null) {
+    const sc = socColor(p.soc);
+    const offset = SOC_ARC_LEN * (1 - p.soc / 100);
+    el('soc').textContent = p.soc;
+    el('soc').style.color = sc;
+    // Home arc gauge
+    const arc = document.getElementById('soc-arc-fill');
+    arc.style.strokeDashoffset = offset;
+    arc.style.stroke = sc;
+    arc.classList.toggle('charging', !!p.is_charging);
+    // Charge page arc gauge (zelfde formaat)
+    const cArc = document.getElementById('charge-arc-fill');
+    cArc.style.strokeDashoffset = offset;
+    cArc.style.stroke = sc;
+    cArc.classList.toggle('charging', !!p.is_charging);
+    el('charge-gauge-val').textContent = p.soc;
+    el('charge-gauge-val').style.color = sc;
+  }
+  if (p.range_km != null) {
+    el('range').textContent = p.range_km + ' km bereik';
+    el('charge-gauge-range').textContent = p.range_km + ' km bereik';
+  }
+  if (p.locked != null) {
+    tc('act-lock', 'active-state', p.locked);
+    tc('act-unlock', 'active-state', !p.locked);
+  }
+}
+
+function updateCharge(p) {
+  const badge = el('charge-badge');
+  if (p.is_charging) {
+    badge.classList.add('active');
+    const kw = p.charge_power_kw ? p.charge_power_kw.toFixed(1) + ' kW' : 'Actief';
+    el('charge-power-badge').textContent = kw;
+    el('charge-gauge-status').textContent = 'Aan het laden';
+    el('charge-gauge-status').style.color = 'var(--primary)';
+  } else if (p.is_plugged) {
+    badge.classList.remove('active');
+    el('charge-gauge-status').textContent = 'Aangesloten';
+    el('charge-gauge-status').style.color = 'var(--info)';
+  } else {
+    badge.classList.remove('active');
+    el('charge-gauge-status').textContent = 'Niet aangesloten';
+    el('charge-gauge-status').style.color = '';
+  }
+  const csColor = p.is_charging ? 'var(--success)' : '';
+  el('cs-power').textContent = p.charge_power_kw ? p.charge_power_kw.toFixed(1) : '--';
+  el('cs-power').style.color = csColor;
+  el('cs-voltage').textContent = p.charge_voltage ? Math.round(p.charge_voltage) : '--';
+  el('cs-voltage').style.color = csColor;
+  el('cs-current').textContent = p.charge_current ? Math.round(p.charge_current) : '--';
+  el('cs-current').style.color = csColor;
+  el('cs-time').textContent = p.time_to_full_min != null ? p.time_to_full_min : '--';
+  el('cs-time').style.color = csColor;
+  el('cd-speed').textContent = p.charge_speed != null ? p.charge_speed + ' km/min' : '--';
+  const lidOpen = p.charge_lid_ac==='1' || p.charge_lid_dc==='1';
+  el('cd-lid').textContent = lidOpen ? 'Open' : 'Dicht';
+  el('cd-lid').style.color = lidOpen ? 'var(--primary)' : 'var(--success)';
+  // Charging banner on frontpage
+  const banner = el('charge-banner');
+  if (p.is_charging) {
+    banner.classList.add('active');
+    el('cb-power').textContent = (p.charge_power_kw ? p.charge_power_kw.toFixed(1) : '--') + ' kW';
+    el('cb-bar-fill').style.width = (p.soc || 0) + '%';
+    el('cb-soc').textContent = (p.soc || '--') + '% → ' + (p.charge_limit || 80) + '%';
+    el('cb-time').textContent = p.time_to_full_min != null ? 'Nog ~' + p.time_to_full_min + ' min' : '';
+  } else {
+    banner.classList.remove('active');
+  }
+}
+
+function updateClimate(p) {
+  if (p.interior_temp != null) el('clim-temp').textContent = p.interior_temp.toFixed(1) + '°C';
+  const hToggle = el('heat-toggle');
+  const hStatus = el('heat-status');
+  const inCooldown = Date.now() < _climateOverrideUntil;
+  if (hToggle && !inCooldown) {
+    _heatProgrammatic = true;
+    hToggle.checked = !!p.airco_active;
+    _heatProgrammatic = false;
+    hStatus.textContent = p.airco_active ? 'Aan' : 'Uit';
+    hStatus.style.color = p.airco_active ? 'var(--success)' : 'var(--text2)';
+  }
+  // Sync mini-toggles with actual state (skip during cooldown)
+  if (!inCooldown) {
+    // Sync level buttons with API state
+    if (p.seat_heat_driver != null) { const v = +p.seat_heat_driver || 0; _levelValues['seat-heat-fl'] = v; selectBtn('seat-heat-fl-btns', v); }
+    if (p.seat_heat_passenger != null) { const v = +p.seat_heat_passenger || 0; _levelValues['seat-heat-fr'] = v; selectBtn('seat-heat-fr-btns', v); }
+    if (p.seat_vent_driver != null) { const v = +p.seat_vent_driver || 0; _levelValues['seat-vent-fl'] = v; selectBtn('seat-vent-fl-btns', v); }
+    if (p.seat_vent_passenger != null) { const v = +p.seat_vent_passenger || 0; _levelValues['seat-vent-fr'] = v; selectBtn('seat-vent-fr-btns', v); }
+    if (p.steering_heat != null) { const v = +p.steering_heat || 0; _levelValues['steer'] = v; selectBtn('steer-btns', v); }
+  }
+  if (p.airco_active) {
+    el('act-climate').classList.add('active-state');
+  } else {
+    el('act-climate').classList.remove('active-state');
+  }
+  // Sync preheat state (airco_active covers both regular climate and preheat)
+  if (!inCooldown) {
+    _preheatActive = !!p.airco_active;
+    const phCard = el('preset-preheat');
+    if (phCard) phCard.classList.toggle('active', _preheatActive);
+    const phStatus = el('preheat-status');
+    if (phStatus) { phStatus.textContent = _preheatActive ? 'Aan' : 'Uit'; phStatus.style.color = _preheatActive ? 'var(--success)' : 'var(--text2)'; }
+    const phToggle = el('preheat-toggle');
+    if (phToggle) phToggle.checked = _preheatActive;
+  }
+  // Sync defrost state
+  if (!inCooldown) {
+    _defrostActive = !!p.defrost;
+    const dfCard = el('preset-defrost');
+    if (dfCard) dfCard.classList.toggle('active', _defrostActive);
+    const homeDefrost = el('ctrl-defrost');
+    if (homeDefrost) homeDefrost.classList.toggle('cmd-sent', _defrostActive);
+    const homeDesc = el('defrost-home-desc');
+    if (homeDesc) homeDesc.textContent = _defrostActive ? 'Actief' : 'Tik om te activeren';
+  }
+}
+
+function switchVehicleView(view) {
+  el('vv-tab-tyres').classList.toggle('active', view === 'tyres');
+  el('vv-tab-doors').classList.toggle('active', view === 'doors');
+  el('vv-tyres').classList.toggle('hidden', view !== 'tyres');
+  el('vv-doors').classList.toggle('hidden', view !== 'doors');
+  el('lock-pill').style.display = view === 'doors' ? 'flex' : 'none';
+}
+
+function updateTyres(p) {
+  if (!p.tyres) return;
+  const m = {driverFront:'fl',passengerFront:'fr',driverRear:'rl',passengerRear:'rr'};
+  for (const [k,s] of Object.entries(m)) {
+    const t = p.tyres[k]; if(!t) continue;
+    if (t.pressure_bar != null) {
+      el('tyre-'+s+'-val').textContent = t.pressure_bar.toFixed(1);
+      el('tyre-'+s+'-val').className = 'tp-bar'+(t.warning?' warn':'');
+      el('tp-'+s).className = 'tp tp-'+s+(t.warning?' warn':'');
+    }
+    if (t.temp != null) el('tyre-'+s+'-temp').textContent = t.temp+'°C';
+  }
+}
+
+function updateDoors(p) {
+  if (p.doors) {
+    const m = {driverFront:'fl',passengerFront:'fr',driverRear:'rl',passengerRear:'rr'};
+    for (const [k,s] of Object.entries(m)) {
+      const d = p.doors[k];
+      const isOpen = d && d.open;
+      const e = el('dr-'+s);
+      if (e) e.className = 'dd '+(isOpen?'open':'closed')+' dd-'+s;
+    }
+  }
+  if (p.trunk_open != null) el('dr-trunk').className = 'dd '+(p.trunk_open?'open':'closed')+' dd-trunk';
+  if (p.hood_open != null) el('dr-hood').className = 'dd '+(p.hood_open?'open':'closed')+' dd-hood';
+  if (p.windows) {
+    const m = {driverFront:'fl',passengerFront:'fr',driverRear:'rl',passengerRear:'rr'};
+    for (const [k,s] of Object.entries(m)) {
+      const w = p.windows[k]; if (!w) continue;
+      const wEl = el('wl-'+s);
+      if (wEl) wEl.className = 'wbar '+(w.closed?'closed':'open')+' wbar-'+s;
+    }
+  }
+  if (p.locked != null) {
+    el('lock-pill').className = 'lock-status '+(p.locked?'locked':'unlocked');
+    el('lock-text').textContent = p.locked ? 'Vergrendeld' : 'Ontgrendeld';
+  }
+  // Homepage mini status
+  if (p.locked != null) {
+    const lt = el('hvs-lock-txt'), lw = el('hvs-lock');
+    lt.textContent = p.locked ? 'Op slot' : 'Open';
+    lw.style.color = p.locked ? 'var(--success)' : 'var(--danger)';
+  }
+  if (p.doors) {
+    const anyOpen = Object.values(p.doors).some(d => d && d.open) || p.trunk_open || p.hood_open;
+    const dt = el('hvs-doors-txt'), dw = el('hvs-doors');
+    dt.textContent = anyOpen ? 'Deur open' : 'Deuren dicht';
+    dw.style.color = anyOpen ? 'var(--danger)' : 'var(--success)';
+  }
+  if (p.windows) {
+    const anyWinOpen = Object.values(p.windows).some(w => w && !w.closed);
+    const wt = el('hvs-win-txt'), ww = el('hvs-windows');
+    wt.textContent = anyWinOpen ? 'Raam open' : 'Ramen dicht';
+    ww.style.color = anyWinOpen ? 'var(--danger)' : 'var(--success)';
+  }
+}
+
+// updateService verwijderd — samengevoegd in updateStats
+
+function updateStats(p) {
+  if (p.avg_consumption_kwh != null) {
+    el('st-consumption').textContent = p.avg_consumption_kwh.toFixed(1);
+    el('st-consumption-kmkwh').textContent = p.avg_consumption_kwh > 0 ? (100 / p.avg_consumption_kwh).toFixed(1) : '--';
+  }
+  if (p.range_km != null) el('st-range').textContent = p.range_km;
+  if (p.soc != null) el('st-soc').textContent = p.soc;
+  if (p.odometer_km != null) el('st-odo').textContent = p.odometer_km.toLocaleString('nl-NL');
+  el('st-limit').textContent = p.charge_limit || '--';
+  if (p.battery_12v != null) el('st-12v').textContent = p.battery_12v.toFixed(1);
+  if (p.dist_service_km != null) el('st-service-km').textContent = p.dist_service_km.toLocaleString('nl-NL');
+  if (p.days_to_service != null) el('st-service-days').textContent = p.days_to_service;
+  if (p.pm25_interior != null) el('st-pm25').textContent = p.pm25_interior;
+  if (p.interior_temp != null) el('st-temp').textContent = p.interior_temp.toFixed(1) + '°C';
+  if (p.plate) el('st-plate').textContent = p.plate;
+  if (p.vin) el('st-vin').textContent = p.vin;
+}
+
+let _tripsData = [];
+const _tripMaps = {};
+
+function onTripFilterChange() {
+  const sel = el('trip-days').value;
+  const rangeDiv = document.getElementById('trip-date-range');
+  if (sel === 'custom') {
+    rangeDiv.style.display = 'flex';
+  } else {
+    rangeDiv.style.display = 'none';
+    loadTrips();
+  }
+}
+
+async function loadTrips() {
+  const days = el('trip-days').value;
+  const dateFrom = el('trip-date-from').value;
+  const dateTo = el('trip-date-to').value;
+  const container = el('trip-list');
+  if (days === 'custom' && !dateFrom) return;
+  container.innerHTML = '<div style="color:var(--text3);font-size:12px;text-align:center;padding:16px 0">Laden...</div>';
+  try {
+    const fetchDays = days === 'custom' ? '0' : days;
+    const r = await fetch(`/api/trips?days=${fetchDays}&size=200`);
+    if (!r.ok) throw new Error('API fout');
+    const d = await r.json();
+    let trips = d.trips || [];
+    if (days === 'custom' && dateFrom) {
+      trips = trips.filter(t => t.date >= dateFrom && (!dateTo || t.date <= dateTo));
+    }
+    _tripsData = trips;
+    if (trips.length === 0) {
+      container.innerHTML = '<div style="color:var(--text3);font-size:12px;text-align:center;padding:16px 0">Geen ritten gevonden</div>';
+      return;
+    }
+    container.innerHTML = trips.map((t, i) => `
+      <div class="trip-item" id="trip-${i}" onclick="toggleTrip(${i}, event)">
+        <div class="trip-row">
+          <input type="checkbox" class="trip-check" data-idx="${i}" onclick="event.stopPropagation()">
+          <div class="trip-content">
+            <div class="trip-header">
+              <span class="trip-date">${escHtml(t.date)}</span>
+              <span style="display:flex;align-items:center">
+                <span class="trip-time">${escHtml(t.start)} – ${escHtml(t.end)}</span>
+                <span class="trip-chevron">▶</span>
+              </span>
+            </div>
+            ${t.start_lat ? `<div class="trip-location" id="trip-loc-${i}">📍 Laden...</div>` : ''}
+            <div class="trip-stats">
+              <span class="trip-stat"><b>${escHtml(t.distance_km)}</b> km</span>
+              <span class="trip-stat"><b>${escHtml(t.duration_min)}</b> min</span>
+              <span class="trip-stat"><b>${escHtml(t.avg_speed_kmh)}</b> km/h</span>
+              <span class="trip-stat"><b>${escHtml(parseFloat(t.energy_kwh).toFixed(2))}</b> kWh</span>
+              <span class="trip-stat"><b>${escHtml(parseFloat(t.consumption_per_100km).toFixed(1))}</b> kWh/100km</span>
+              <span class="trip-stat"><b>${t.consumption_per_100km > 0 ? escHtml((100 / parseFloat(t.consumption_per_100km)).toFixed(1)) : '--'}</b> km/kWh</span>
+            </div>
+          </div>
+        </div>
+        <div class="trip-expand">
+          <div class="trip-map" id="trip-map-${i}"></div>
+        </div>
+      </div>
+    `).join('');
+    // Reverse geocode locations (throttled)
+    trips.forEach((t, i) => {
+      if (t.start_lat && t.start_lng) {
+        setTimeout(() => reverseGeocode(t, i), i * 300);
+      }
+    });
+  } catch (e) {
+    container.innerHTML = `<div style="color:#f44;font-size:12px;text-align:center;padding:16px 0">${escHtml(e.message)}</div>`;
+  }
+}
+
+async function reverseGeocode(t, idx) {
+  try {
+    const startR = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${t.start_lat}&lon=${t.start_lng}&format=json&zoom=16`);
+    const startD = await startR.json();
+    let label = startD.display_name ? startD.display_name.split(',').slice(0, 3).join(', ') : '';
+    if (t.end_lat && t.end_lng && (t.end_lat !== t.start_lat || t.end_lng !== t.start_lng)) {
+      const endR = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${t.end_lat}&lon=${t.end_lng}&format=json&zoom=16`);
+      const endD = await endR.json();
+      const endLabel = endD.display_name ? endD.display_name.split(',').slice(0, 3).join(', ') : '';
+      if (endLabel && endLabel !== label) label += ' → ' + endLabel;
+    }
+    const locEl = document.getElementById(`trip-loc-${idx}`);
+    if (locEl) locEl.textContent = '📍 ' + (label || 'Onbekend');
+  } catch {}
+}
+
+async function toggleTrip(idx, event) {
+  if (event.target.classList.contains('trip-check')) return;
+  const item = document.getElementById(`trip-${idx}`);
+  const wasExpanded = item.classList.contains('expanded');
+  // Collapse all others
+  document.querySelectorAll('.trip-item.expanded').forEach(el => {
+    el.classList.remove('expanded');
+  });
+  if (wasExpanded) return;
+  item.classList.add('expanded');
+  const mapContainer = document.getElementById(`trip-map-${idx}`);
+  const t = _tripsData[idx];
+  // Init or show map
+  if (!_tripMaps[idx]) {
+    mapContainer.innerHTML = '<div style="color:var(--text3);font-size:11px;text-align:center;padding:40px 0">Route laden...</div>';
+    try {
+      const r = await fetch(`/api/trips/${t.tripId}/trackpoints?report_time=${t.reportTime || 0}`);
+      const data = await r.json();
+      const points = (data.list || data.data || data || []);
+      mapContainer.innerHTML = '';
+      const map = L.map(mapContainer, { zoomControl: false, attributionControl: false });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+      if (Array.isArray(points) && points.length > 0) {
+        const coords = points.map(p => [p.latitude || p.lat, p.longitude || p.lng]).filter(c => c[0] && c[1]);
+        if (coords.length > 0) {
+          L.polyline(coords, { color: '#f97316', weight: 4 }).addTo(map);
+          L.circleMarker(coords[0], { radius: 6, color: '#22c55e', fillColor: '#22c55e', fillOpacity: 1 }).addTo(map).bindPopup('Start');
+          L.circleMarker(coords[coords.length - 1], { radius: 6, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 1 }).addTo(map).bindPopup('Eind');
+          map.fitBounds(L.latLngBounds(coords), { padding: [20, 20] });
+        }
+      } else if (t.start_lat && t.start_lng) {
+        // Fallback: show start/end markers only
+        const startLL = [t.start_lat, t.start_lng];
+        L.circleMarker(startLL, { radius: 6, color: '#22c55e', fillOpacity: 1 }).addTo(map).bindPopup('Start');
+        if (t.end_lat && t.end_lng) {
+          const endLL = [t.end_lat, t.end_lng];
+          L.circleMarker(endLL, { radius: 6, color: '#ef4444', fillOpacity: 1 }).addTo(map).bindPopup('Eind');
+          map.fitBounds(L.latLngBounds([startLL, endLL]), { padding: [30, 30] });
+        } else {
+          map.setView(startLL, 14);
+        }
+      } else {
+        mapContainer.innerHTML = '<div style="color:var(--text3);font-size:11px;text-align:center;padding:40px 0">Geen routedata beschikbaar</div>';
+        return;
+      }
+      _tripMaps[idx] = map;
+    } catch (e) {
+      mapContainer.innerHTML = `<div style="color:#f44;font-size:11px;text-align:center;padding:40px 0">${escHtml(e.message)}</div>`;
+    }
+  } else {
+    setTimeout(() => _tripMaps[idx].invalidateSize(), 100);
+  }
+}
+
+function downloadTripsCSV() {
+  const days = el('trip-days').value;
+  if (days === 'custom') {
+    const dateFrom = el('trip-date-from').value;
+    const dateTo = el('trip-date-to').value;
+    if (!dateFrom) return;
+    let url = `/api/trips/csv?days=0&date_from=${dateFrom}`;
+    if (dateTo) url += `&date_to=${dateTo}`;
+    window.open(url, '_blank');
+  } else {
+    window.open(`/api/trips/csv?days=${days}`, '_blank');
+  }
+}
+
+function climatePreset(preset) {
+  document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('active'));
+  const card = el('preset-' + preset);
+  if (card) card.classList.add('active');
+}
+
+let _heatProgrammatic = false;
+let _climateOverrideUntil = 0; // cooldown: don't let API override toggles after manual action
+function toggleHeat(on) {
+  if (_heatProgrammatic) return;
+  _climateOverrideUntil = Date.now() + 15000; // 15s cooldown
+  if (on) {
+    ctrl('preheat', { temperature: parseFloat(el('slider-temp').value) });
+  } else {
+    ctrl('stop_climate');
+  }
+  el('heat-status').textContent = on ? 'Aan' : 'Uit';
+  el('heat-status').style.color = on ? 'var(--success)' : 'var(--text2)';
+}
+
+function togglePreheatConfig() {
+  // Als preheat actief is: uitzetten (toggle-gedrag)
+  if (_preheatActive) {
+    togglePreheatAction(false);
+    el('preheat-config').style.display = 'none';
+    return;
+  }
+  // Anders: config panel tonen/verbergen
+  const cfg = el('preheat-config');
+  if (cfg.style.display === 'none') {
+    cfg.style.display = 'block';
+    const ts = el('ph-temp'); if (ts) updateSliderFill(ts);
+    const ds = el('ph-dur'); if (ds) updateSliderFill(ds);
+  } else {
+    cfg.style.display = 'none';
+  }
+}
+
+let _defrostActive = false;
+async function toggleDefrost() {
+  await _toggleDefrostAction();
+}
+
+async function toggleDefrostHome() {
+  await _toggleDefrostAction();
+}
+
+async function _toggleDefrostAction() {
+  const activate = !_defrostActive;
+  const action = activate ? 'defrost' : 'defrost_off';
+  const homeCard = el('ctrl-defrost');
+  const climateCard = el('preset-defrost');
+  try {
+    const r = await fetch('/api/control/' + action, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    const d = await r.json();
+    if (d.ok) {
+      _defrostActive = activate;
+      if (homeCard) {
+        homeCard.classList.toggle('cmd-sent', activate);
+        const desc = el('defrost-home-desc');
+        if (desc) desc.textContent = activate ? 'Actief' : 'Tik om te activeren';
+      }
+      if (climateCard) climateCard.classList.toggle('active', activate);
+      showToast(activate ? 'Ontdooien gestart' : 'Ontdooien gestopt', true);
+      setTimeout(loadData, 3000);
+    } else {
+      showToast(d.error || 'Fout bij ontdooien', false);
+    }
+  } catch(e) {
+    showToast('Verbinding mislukt: ' + e, false);
+  }
+}
+
+// === Sentry Mode ===
+let _sentryActive = false;
+async function toggleSentry() {
+  const activate = !_sentryActive;
+  const action = activate ? 'sentry_on' : 'sentry_off';
+  const card = el('ctrl-sentry');
+  try {
+    const r = await fetch('/api/control/' + action, { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    const d = await r.json();
+    if (d.ok) {
+      _sentryActive = activate;
+      if (card) card.classList.toggle('cmd-sent', activate);
+      const desc = el('sentry-desc');
+      if (desc) desc.textContent = activate ? 'Actief' : 'Bewakingsmodus';
+      showToast(activate ? 'Sentry ingeschakeld' : 'Sentry uitgeschakeld', true);
+      setTimeout(loadData, 10000);
+    } else {
+      showToast(d.error || 'Fout bij sentry', false);
+    }
+  } catch(e) {
+    showToast('Verbinding mislukt: ' + e, false);
+  }
+}
+
+// === Schedules ===
+let _schedClimateMode = 'defrost';
+
+function setSchedMode(mode) {
+  _schedClimateMode = mode;
+  el('sc-mode-defrost').classList.toggle('active', mode === 'defrost');
+  el('sc-mode-climate').classList.toggle('active', mode === 'climate');
+  const opts = el('sched-climate-opts');
+  if (mode === 'climate') {
+    opts.style.display = 'block';
+    const ts = el('sc-temp'); if (ts) updateSliderFill(ts);
+    const ds = el('sc-dur'); if (ds) updateSliderFill(ds);
+  } else {
+    opts.style.display = 'none';
+  }
+  saveSchedule('climate');
+}
+
+function setScLevel(id, level, btn) {
+  el(id).value = level;
+  btn.parentElement.querySelectorAll('.ph-lvl-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  saveSchedule('climate');
+}
+
+async function loadSchedules() {
+  try {
+    const r = await fetch('/api/schedules');
+    if (!r.ok) return;
+    const data = await r.json();
+    if (data.climate) {
+      const c = data.climate;
+      el('sched-climate-toggle').checked = !!c.enabled;
+      if (c.time) el('sched-climate-time').value = c.time;
+      if (c.repeat) el('sched-climate-repeat').value = c.repeat;
+      setSchedMode(c.mode || 'defrost');
+      if (c.temperature) { el('sc-temp').value = c.temperature; el('sc-temp-val').textContent = c.temperature + '°C'; updateSliderFill(el('sc-temp')); }
+      if (c.duration_min) { el('sc-dur').value = c.duration_min; el('sc-dur-val').textContent = c.duration_min + ' min'; updateSliderFill(el('sc-dur')); }
+      // Restore level buttons
+      ['sc-seat-heat-driver','sc-seat-heat-passenger','sc-seat-vent-driver','sc-seat-vent-passenger','sc-steering-heat'].forEach(id => {
+        const key = id.replace('sc-','').replace(/-/g,'_');
+        const val = c[key] || 0;
+        el(id).value = val;
+        const btns = el(id).parentElement.querySelectorAll('.ph-lvl-btn');
+        btns.forEach((b,i) => b.classList.toggle('active', i === val));
+      });
+    }
+    if (data.charge) {
+      el('sched-charge-toggle').checked = !!data.charge.enabled;
+      if (data.charge.time_from) el('sched-charge-from').value = data.charge.time_from;
+      if (data.charge.time_to) el('sched-charge-to').value = data.charge.time_to;
+      if (data.charge.repeat) el('sched-charge-repeat').value = data.charge.repeat;
+    }
+  } catch(e) {}
+}
+
+async function saveSchedule(type) {
+  if (type === 'climate') {
+    const body = {
+      enabled: el('sched-climate-toggle').checked,
+      time: el('sched-climate-time').value,
+      repeat: el('sched-climate-repeat').value,
+      mode: _schedClimateMode,
+      temperature: +el('sc-temp').value,
+      duration_min: +el('sc-dur').value,
+      seat_heat_driver: +el('sc-seat-heat-driver').value,
+      seat_heat_passenger: +el('sc-seat-heat-passenger').value,
+      seat_vent_driver: +el('sc-seat-vent-driver').value,
+      seat_vent_passenger: +el('sc-seat-vent-passenger').value,
+      steering_heat: +el('sc-steering-heat').value,
+    };
+    try {
+      const r = await fetch('/api/schedules/climate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const d = await r.json();
+      if (d.ok) {
+        const label = _schedClimateMode === 'defrost' ? 'Ontdooien' : 'Klimaat';
+        showToast(label + ' planning ' + (body.enabled ? 'ingesteld om ' + body.time : 'uitgeschakeld'), true);
+      }
+    } catch(e) { showToast('Planning opslaan mislukt', false); }
+  } else if (type === 'charge') {
+    const body = {
+      enabled: el('sched-charge-toggle').checked,
+      time_from: el('sched-charge-from').value,
+      time_to: el('sched-charge-to').value,
+      repeat: el('sched-charge-repeat').value,
+      limit: +el('slider-charge-limit').value,
+    };
+    try {
+      const r = await fetch('/api/schedules/charge', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const d = await r.json();
+      if (d.ok) showToast('Laden planning ' + (body.enabled ? body.time_from + ' – ' + body.time_to : 'uitgeschakeld'), true);
+    } catch(e) { showToast('Planning opslaan mislukt', false); }
+  }
+}
+
+function setPhLevel(id, level, btn) {
+  el(id).value = level;
+  const parent = btn.parentElement;
+  parent.querySelectorAll('.ph-lvl-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+let _preheatActive = false;
+async function togglePreheatAction(on) {
+  if (on) {
+    const temp = +el('ph-temp').value;
+    const dur = +el('ph-dur').value;
+    const opts = { temperature: temp, duration_min: dur };
+    if (el('ph-cabin').checked) opts.cabin = true;
+    const seatDrv = +el('ph-seat-driver').value;
+    if (seatDrv > 0) opts.seat_heat_driver = seatDrv;
+    const seatPass = +el('ph-seat-passenger').value;
+    if (seatPass > 0) opts.seat_heat_passenger = seatPass;
+    const steer = +el('ph-steering').value;
+    if (steer > 0) opts.steering_heat = steer;
+    if (el('ph-rear-defrost').checked) opts.rear_defrost = true;
+    if (el('ph-battery').checked) opts.battery_precondition = true;
+    try {
+      const r = await fetch('/api/control/preheat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(opts) });
+      const d = await r.json();
+      if (d.ok) {
+        _preheatActive = true;
+        el('preset-preheat').classList.add('active');
+        el('preheat-status').textContent = 'Aan';
+        el('preheat-status').style.color = 'var(--success)';
+        showToast('Voorverwarmen gestart (' + temp + '°C, ' + dur + ' min)', true);
+        setTimeout(loadData, 3000);
+      } else {
+        el('preheat-toggle').checked = false;
+        showToast(d.error || 'Fout bij voorverwarmen', false);
+      }
+    } catch(e) {
+      el('preheat-toggle').checked = false;
+      showToast('Verbinding mislukt: ' + e, false);
+    }
+  } else {
+    try {
+      const r = await fetch('/api/control/stop_climate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const d = await r.json();
+      if (d.ok) {
+        _preheatActive = false;
+        el('preset-preheat').classList.remove('active');
+        el('preheat-status').textContent = 'Uit';
+        el('preheat-status').style.color = 'var(--text2)';
+        showToast('Voorverwarmen gestopt', true);
+        setTimeout(loadData, 3000);
+      } else {
+        el('preheat-toggle').checked = true;
+        showToast(d.error || 'Fout bij stoppen', false);
+      }
+    } catch(e) {
+      el('preheat-toggle').checked = true;
+      showToast('Verbinding mislukt: ' + e, false);
+    }
+  }
+}
+
+function renderData(d) {
+  document.body.classList.remove('loading');
+  const p = d.parsed || {}; state = p;
+  updateCarImage(p); updateSOC(p); updateCharge(p);
+  updateClimate(p); updateTyres(p); updateDoors(p); updateStats(p);
+  el('d-vin').textContent = p.vin || '--';
+  el('topbar-model').textContent = p.model || 'ZEEKR X';
+  if (p.interior_temp != null) el('d-temp').textContent = p.interior_temp.toFixed(1)+'°C';
+  if (p.odometer_km != null) el('d-odo').textContent = p.odometer_km.toLocaleString('nl-NL')+' km';
+  if (p.avg_consumption_kwh != null) {
+    el('d-consumption').textContent = p.avg_consumption_kwh.toFixed(1)+' kWh/100km';
+    el('d-consumption-kmkwh').textContent = p.avg_consumption_kwh > 0 ? (100 / p.avg_consumption_kwh).toFixed(1)+' km/kWh' : '--';
+  }
+  const lim = p.charge_limit || 80;
+  el('d-limit').textContent = lim+'%';
+  const ls = el('slider-charge-limit');
+  if (ls && !ls.matches(':active')) { ls.value = lim; updateSliderFill(ls); el('lbl-charge-limit').textContent = lim+'%'; }
+  // Sentry status
+  _sentryActive = !!p.sentry_active;
+  const sentryCard = el('ctrl-sentry');
+  if (sentryCard) sentryCard.classList.toggle('cmd-sent', _sentryActive);
+  const sentryDesc = el('sentry-desc');
+  if (sentryDesc) sentryDesc.textContent = _sentryActive ? 'Actief' : 'Bewakingsmodus';
+  el('topbar-status').textContent = new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
+}
+
+let _connFails = 0;
+async function loadData() {
+  const dot = el('conn-dot');
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const r = await fetch('/api/status', { signal: AbortSignal.timeout(15000) });
+      if (r.status === 401) { window.location = '/login'; return; }
+      renderData(await r.json());
+      dot.className = 'conn-dot online';
+      _connFails = 0;
+      return;
+    } catch(e) {
+      if (attempt === 0) { await new Promise(r => setTimeout(r, 2000)); continue; }
+    }
+  }
+  _connFails++;
+  dot.className = 'conn-dot offline';
+  if (_connFails >= 2) showToast('Verbinding mislukt', false);
+}
+const ACTION_LABELS = {
+  'lock': 'Vergrendeld', 'unlock': 'Ontgrendeld',
+  'preheat': 'Verwarmen gestart', 'stop_climate': 'Klimaat gestopt',
+  'flash': 'Lichten geflitst', 'horn': 'Claxon geactiveerd',
+  'trunk_open': 'Kofferbak geopend', 'trunk_close': 'Kofferbak gesloten',
+  'start_charge': 'Laden gestart', 'stop_charge': 'Laden gestopt',
+  'defrost': 'Ontdooien gestart', 'defrost_off': 'Ontdooien gestopt',
+  'defrost_front': 'Voorruit ontdooien', 'defrost_rear': 'Achterruit ontdooien',
+  'seat_heating': 'Stoelverwarming aangepast', 'seat_ventilation': 'Stoelventilatie aangepast',
+  'steering_heating': 'Stuurverwarming aangepast', 'fan_speed': 'Ventilator aangepast',
+  'find': 'Auto zoeken geactiveerd', 'set_charge_limit': 'Laadlimiet ingesteld',
+  'ventilate_open': 'Ventileren gestart', 'ventilate_close': 'Ventileren gestopt',
+  'open_windows': 'Ramen geopend', 'close_windows': 'Ramen gesloten',
+};
+async function ctrl(action, body) {
+  const btn = event && event.target ? event.target.closest('.pill-btn,.qa-circle,.ctrl-card') : null;
+  if (btn) {
+    if (btn.classList.contains('pill-btn')) btn.classList.add('cmd-sending');
+    else btn.classList.add('cmd-sent');
+  }
+  try {
+    const d = await (await fetch('/api/control/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})})).json();
+    if (btn) {
+      btn.classList.remove('cmd-sending');
+      if (btn.classList.contains('pill-btn')) {
+        const cls = d.ok ? 'cmd-ok' : 'cmd-err';
+        const orig = btn.textContent;
+        btn.classList.add(cls); btn.textContent = d.ok ? '✓ Verstuurd' : '✗ Fout';
+        setTimeout(() => { btn.classList.remove(cls); btn.textContent = orig; }, 1800);
+      } else {
+        setTimeout(() => btn.classList.remove('cmd-sent'), 1500);
+      }
+    }
+    if (d.ok) {
+      showToast(ACTION_LABELS[action] || action.replace(/_/g,' '), true);
+      // Optimistische UI update voor lock/unlock
+      if (action === 'lock' || action === 'unlock') {
+        const isLocked = action === 'lock';
+        tc('act-lock', 'active-state', isLocked);
+        tc('act-unlock', 'active-state', !isLocked);
+        el('lock-pill').className = 'lock-status '+(isLocked?'locked':'unlocked');
+        el('lock-text').textContent = isLocked ? 'Vergrendeld' : 'Ontgrendeld';
+        const lt = el('hvs-lock-txt'), lw = el('hvs-lock');
+        if (lt) { lt.textContent = isLocked ? 'Op slot' : 'Open'; }
+        if (lw) { lw.style.color = isLocked ? 'var(--success)' : 'var(--danger)'; }
+      }
+      setTimeout(loadData, 3000);
+    }
+    else showToast(d.error||'Fout', false);
+  } catch(e) {
+    if (btn) { btn.classList.remove('cmd-sending','cmd-sent'); }
+    showToast(''+e, false);
+  }
+}
+
+let pullY=0, pulling=false;
+document.addEventListener('touchstart', e => { if(window.scrollY===0 && e.touches[0].clientY<300){pullY=e.touches[0].clientY;pulling=true;} });
+document.addEventListener('touchend', e => { if(!pulling)return;pulling=false;if(e.changedTouches[0].clientY-pullY>60){loadData();showToast('Vernieuwen...',true);} });
+
+initSliders();
+// Heat toggle: use addEventListener so programmatic .checked changes don't fire
+el('heat-toggle').addEventListener('change', function() { toggleHeat(this.checked); });
+
+// Load saved car color
+(function() {
+  const saved = localStorage.getItem('zeekr_color') || 'mist_grey';
+  el('car-base').src = '/static/hero_' + saved + '.webp';
+})();
+
+// === Home map ===
+let homeMap = null;
+let homeMarker = null;
+let carLocation = null;
+
+function initHomeMap(lat, lon) {
+  if (!homeMap) {
+    homeMap = L.map('home-map-wrap', {
+      zoomControl: false, attributionControl: false,
+      dragging: true, scrollWheelZoom: false, doubleClickZoom: true,
+      touchZoom: true
+    }).setView([lat, lon], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19
+    }).addTo(homeMap);
+    homeMarker = L.marker([lat, lon]).addTo(homeMap);
+    // Fix map rendering in hidden/dynamic containers
+    setTimeout(() => homeMap.invalidateSize(), 200);
+  } else {
+    homeMap.setView([lat, lon], 15);
+    homeMarker.setLatLng([lat, lon]);
+  }
+}
+
+async function loadLocation() {
+  try {
+    const r = await fetch('/api/location');
+    const d = await r.json();
+    if (d.lat && d.lon) {
+      carLocation = { lat: d.lat, lon: d.lon };
+      initHomeMap(d.lat, d.lon);
+      el('btn-navigate').style.display = 'inline-flex';
+      // Reverse geocode for address
+      try {
+        const geo = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${d.lat}&lon=${d.lon}&format=json&zoom=16`);
+        const g = await geo.json();
+        el('home-map-addr-text').textContent = g.display_name || `${d.lat}, ${d.lon}`;
+      } catch { el('home-map-addr-text').textContent = `${d.lat.toFixed(5)}, ${d.lon.toFixed(5)}`; }
+      if (d.timestamp) {
+        const ts = typeof d.timestamp === 'number' ? new Date(d.timestamp > 1e12 ? d.timestamp : d.timestamp * 1000) : new Date(d.timestamp);
+        el('home-map-time').textContent = 'Laatst gezien: ' + ts.toLocaleString('nl-NL', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+      }
+    } else {
+      el('home-map-addr-text').textContent = 'Locatie niet beschikbaar';
+    }
+  } catch(e) { el('home-map-addr-text').textContent = 'Locatie laden mislukt'; }
+}
+
+function openNavigation() {
+  if (carLocation) {
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${carLocation.lat},${carLocation.lon}`, '_blank');
+  }
+}
+
+// ── BUTTON CATALOG ────────────────────────────────────────────────────────
+const QA_CATALOG = {
+  lock:     { label:'Vergrendel',  icon:'i-lock',      action:"ctrl('lock')",              elId:'act-lock' },
+  unlock:   { label:'Ontgrendel',  icon:'i-unlock',    action:"ctrl('unlock')",            elId:'act-unlock' },
+  climate:  { label:'Klimaat',     icon:'i-snowflake', action:"switchPage('climate')",      elId:'act-climate' },
+  charge:   { label:'Laden',       icon:'i-bolt',      action:"switchPage('charge')",       elId:'act-charge' },
+  location: { label:'Locatie',     icon:'i-locate',    action:"switchPage('location')" },
+  status:   { label:'Status',      icon:'i-car',       action:"switchPage('stats')" },
+  find:     { label:'Zoek auto',   icon:'i-locate',    action:"ctrl('find')" },
+};
+const CTRL_CATALOG = {
+  windows: {
+    label:'Ramen', icon:'i-window', desc:'Ventilatie of volledig open', elId:'ctrl-windows',
+    click:"toggleCtrl('ctrl-windows')",
+    expand:`<div style="display:flex;flex-wrap:wrap;gap:6px">
+      <button class="pill-btn" onclick="event.stopPropagation();ctrl('ventilate_open')">&#8595; Ventileren</button>
+      <button class="pill-btn" onclick="event.stopPropagation();ctrl('open_windows')">&#8595;&#8595; Volledig</button>
+      <button class="pill-btn outline-success" onclick="event.stopPropagation();ctrl('close_windows')">&#8593; Dicht</button></div>`
+  },
+  defrost:       { label:'Ontdooien',      icon:'i-defrost',    desc:'Tik om te activeren', elId:'ctrl-defrost', click:"toggleDefrostHome()", descId:'defrost-home-desc' },
+  flash:         { label:'Lichten',        icon:'i-sun',        desc:'Knipperen',     click:"ctrl('flash')" },
+  horn:          { label:'Claxon',         icon:'i-horn',       desc:'Toeter',        click:"ctrl('horn')" },
+  trunk:         { label:'Kofferbak',      icon:'i-trunk',      desc:'Openen',        click:"ctrl('trunk_open')" },
+  trunk_close:   { label:'Klep dicht',     icon:'i-trunk',      desc:'Sluiten',       click:"ctrl('trunk_close')" },
+  start_charge:  { label:'Start laden',    icon:'i-bolt',       desc:'Laden starten', click:"ctrl('start_charge')", iconStyle:'color:var(--success)' },
+  stop_charge:   { label:'Stop laden',     icon:'i-bolt',       desc:'Laden stoppen', click:"ctrl('stop_charge')", iconStyle:'color:var(--danger)' },
+  preheat:       { label:'Voorverwarmen',  icon:'i-sun',        desc:'Cabine warm',   click:"ctrl('preheat')" },
+  stop_climate:  { label:'Klimaat uit',    icon:'i-snowflake',  desc:'Uitzetten',     click:"ctrl('stop_climate')" },
+  sentry:        { label:'Sentry',        icon:'i-shield',     desc:'Bewakingsmodus', elId:'ctrl-sentry', descId:'sentry-desc', click:"toggleSentry()" },
+};
+
+const DEFAULT_LAYOUT = {
+  qa: ['lock','unlock','climate','charge','location'],
+  ctrl: ['windows','defrost','flash','horn','trunk','sentry']
+};
+
+let _cachedLayout = null;
+
+function getLayout() {
+  if (_cachedLayout) return _cachedLayout;
+  try {
+    const s = localStorage.getItem('zeekr_home_layout');
+    if (s) { const l = JSON.parse(s); if (l.qa && l.ctrl) return l; }
+  } catch {}
+  return JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
+}
+
+function saveLayout(layout) {
+  _cachedLayout = layout;
+  localStorage.setItem('zeekr_home_layout', JSON.stringify(layout));
+  // Async sync naar server
+  fetch('/api/prefs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ layout })
+  }).catch(() => {});
+}
+
+async function loadPrefsFromServer() {
+  try {
+    const r = await fetch('/api/prefs');
+    if (!r.ok) return;
+    const prefs = await r.json();
+    if (prefs.layout && prefs.layout.qa && prefs.layout.ctrl) {
+      _cachedLayout = prefs.layout;
+      localStorage.setItem('zeekr_home_layout', JSON.stringify(prefs.layout));
+      renderQARow(); renderCtrlGrid();
+    }
+  } catch {}
+}
+
+let _editMode = false;
+function renderQARow() {
+  const layout = getLayout();
+  const row = el('qa-row');
+  let html = '';
+  layout.qa.forEach(id => {
+    const b = QA_CATALOG[id]; if (!b) return;
+    html += `<div class="qa-item" onclick="${_editMode ? '' : b.action}">
+      <button class="edit-remove" onclick="event.stopPropagation();removeButton('qa','${id}')">✕</button>
+      <div class="qa-circle"${b.elId ? ' id="'+b.elId+'"' : ''}><svg class="icon"><use href="#${b.icon}"/></svg></div>
+      <span class="qa-label">${b.label}</span>
+    </div>`;
+  });
+  html += `<div class="qa-item edit-add-card" onclick="showAddMenu('qa')" style="min-width:52px">
+    <svg class="icon"><use href="#i-plus"/></svg>
+  </div>`;
+  row.innerHTML = html;
+}
+function renderCtrlGrid() {
+  const layout = getLayout();
+  const grid = el('ctrl-grid');
+  let html = '';
+  layout.ctrl.forEach(id => {
+    const b = CTRL_CATALOG[id]; if (!b) return;
+    const elIdAttr = b.elId ? ` id="${b.elId}"` : '';
+    const iconStyle = b.iconStyle ? ` style="${b.iconStyle}"` : '';
+    html += `<div class="ctrl-card"${elIdAttr} onclick="${_editMode ? '' : (b.click || '')}">
+      <button class="edit-remove" onclick="event.stopPropagation();removeButton('ctrl','${id}')">✕</button>
+      <div class="ctrl-icon"${iconStyle}><svg class="icon"><use href="#${b.icon}"/></svg></div>
+      <span class="ctrl-name">${b.label}</span>
+      <span class="ctrl-desc"${b.descId ? ' id="'+b.descId+'"' : ''}>${b.desc || ''}</span>
+      ${b.expand ? '<div class="ctrl-expand">'+b.expand+'</div>' : ''}
+    </div>`;
+  });
+  html += `<div class="ctrl-card edit-add-card" onclick="showAddMenu('ctrl')">
+    <svg class="icon"><use href="#i-plus"/></svg><span>Toevoegen</span>
+  </div>`;
+  grid.innerHTML = html;
+}
+function toggleEditMode() {
+  _editMode = !_editMode;
+  const mc = document.querySelector('.main-card');
+  if (_editMode) mc.classList.add('edit-mode');
+  else mc.classList.remove('edit-mode');
+  renderQARow(); renderCtrlGrid();
+  if (_editMode) { initDragSort('qa'); initDragSort('ctrl'); }
+}
+
+// ── DRAG SORT ──────────────────────────────────────────────────────────
+function initDragSort(section) {
+  const isQA = section === 'qa';
+  const container = isQA ? el('qa-row') : el('ctrl-grid');
+  const items = () => [...container.children].filter(c => !c.classList.contains('edit-add-card'));
+  let dragIdx = -1;
+
+  items().forEach((item, i) => {
+    item.setAttribute('draggable', 'true');
+    item.addEventListener('dragstart', e => {
+      dragIdx = i;
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging');
+      items().forEach(x => x.classList.remove('drag-over'));
+    });
+    item.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      items().forEach(x => x.classList.remove('drag-over'));
+      item.classList.add('drag-over');
+    });
+    item.addEventListener('dragleave', () => item.classList.remove('drag-over'));
+    item.addEventListener('drop', e => {
+      e.preventDefault();
+      const dropIdx = items().indexOf(item);
+      if (dragIdx < 0 || dropIdx < 0 || dragIdx === dropIdx) return;
+      const layout = getLayout();
+      const arr = layout[section];
+      const [moved] = arr.splice(dragIdx, 1);
+      arr.splice(dropIdx, 0, moved);
+      saveLayout(layout);
+      renderQARow(); renderCtrlGrid();
+      initDragSort('qa'); initDragSort('ctrl');
+    });
+
+    // Touch drag support
+    let touchClone = null, touchStartY = 0, touchStartX = 0, touchIdx = -1;
+    item.addEventListener('touchstart', e => {
+      if (!_editMode) return;
+      const t = e.touches[0];
+      touchStartX = t.clientX; touchStartY = t.clientY;
+      touchIdx = i; dragIdx = i;
+      // Long-press feel: slight delay before visual
+      item._touchTimer = setTimeout(() => {
+        item.classList.add('dragging');
+      }, 150);
+    }, { passive: true });
+    item.addEventListener('touchmove', e => {
+      if (!_editMode || dragIdx < 0) return;
+      clearTimeout(item._touchTimer);
+      item.classList.add('dragging');
+      const t = e.touches[0];
+      // Find element under finger
+      const elUnder = document.elementFromPoint(t.clientX, t.clientY);
+      items().forEach(x => x.classList.remove('drag-over'));
+      if (elUnder) {
+        const card = elUnder.closest(isQA ? '.qa-item' : '.ctrl-card');
+        if (card && !card.classList.contains('edit-add-card')) card.classList.add('drag-over');
+      }
+      e.preventDefault();
+    }, { passive: false });
+    item.addEventListener('touchend', e => {
+      clearTimeout(item._touchTimer);
+      if (!_editMode || dragIdx < 0) { item.classList.remove('dragging'); return; }
+      const t = e.changedTouches[0];
+      const elUnder = document.elementFromPoint(t.clientX, t.clientY);
+      item.classList.remove('dragging');
+      items().forEach(x => x.classList.remove('drag-over'));
+      if (elUnder) {
+        const card = elUnder.closest(isQA ? '.qa-item' : '.ctrl-card');
+        if (card && !card.classList.contains('edit-add-card')) {
+          const dropIdx = items().indexOf(card);
+          if (dropIdx >= 0 && dragIdx !== dropIdx) {
+            const layout = getLayout();
+            const arr = layout[section];
+            const [moved] = arr.splice(dragIdx, 1);
+            arr.splice(dropIdx, 0, moved);
+            saveLayout(layout);
+            renderQARow(); renderCtrlGrid();
+            initDragSort('qa'); initDragSort('ctrl');
+          }
+        }
+      }
+      dragIdx = -1;
+    });
+  });
+}
+function removeButton(section, id) {
+  const layout = getLayout();
+  layout[section] = layout[section].filter(x => x !== id);
+  saveLayout(layout);
+  renderQARow(); renderCtrlGrid();
+}
+function addButton(section, id) {
+  const layout = getLayout();
+  if (!layout[section].includes(id)) layout[section].push(id);
+  saveLayout(layout);
+  closeSheet();
+  renderQARow(); renderCtrlGrid();
+}
+let _addMenuSection = 'ctrl';
+function showAddMenu(section) {
+  _addMenuSection = section;
+  const layout = getLayout();
+  const catalog = section === 'qa' ? QA_CATALOG : CTRL_CATALOG;
+  const existing = layout[section];
+  const list = el('add-btn-list');
+  let html = '';
+  Object.keys(catalog).forEach(id => {
+    if (existing.includes(id)) return;
+    const b = catalog[id];
+    html += `<div class="add-btn-item" onclick="addButton('${section}','${id}')">
+      <div class="abi-icon"><svg class="icon"><use href="#${b.icon}"/></svg></div>
+      <span class="abi-label">${b.label}</span>
+    </div>`;
+  });
+  if (!html) html = '<div style="color:var(--text3);font-size:12px;text-align:center;padding:16px 0">Alle knoppen zijn al toegevoegd</div>';
+  list.innerHTML = html;
+  openSheet('add-btn');
+}
+
+// Initial render (localStorage first, then server override)
+renderQARow(); renderCtrlGrid();
+loadPrefsFromServer();
+
+// ── GEOFENCING ────────────────────────────────────────────────────────────
+async function loadFences() {
+  const c = el('fence-list');
+  try {
+    const r = await fetch('/api/fences');
+    const d = await r.json();
+    const fences = d.data || d.list || d.records || [];
+    if (!fences.length) { c.innerHTML = '<div style="color:var(--text3);font-size:12px;text-align:center;padding:8px 0">Geen zones ingesteld</div>'; return; }
+    c.innerHTML = fences.map(f => {
+      const fid = f.id || f.fenceId;
+      const active = f.status === 'true' || f.status === true || f.enabled === true;
+      return `<div class="fence-item">
+        <div class="fence-info">
+          <div class="fence-name">${escHtml(f.name || 'Zone')}</div>
+          <div class="fence-detail">${escHtml(f.radius || '?')}m radius</div>
+        </div>
+        <label class="mini-toggle">
+          <input type="checkbox" ${active ? 'checked' : ''} onchange="toggleFence('${fid}',this.checked)">
+          <div class="mt-track"><div class="mt-thumb"></div></div>
+        </label>
+        <button style="background:none;border:none;color:var(--danger);cursor:pointer;padding:4px" onclick="deleteFence('${fid}')">
+          <svg class="icon icon-sm"><use href="#i-trash"/></svg>
+        </button>
+      </div>`;
+    }).join('');
+  } catch(e) { c.innerHTML = '<div style="color:var(--text3);font-size:12px;text-align:center;padding:8px 0">Laden mislukt</div>'; }
+}
+async function toggleFence(id, enabled) {
+  try {
+    await fetch('/api/fences/'+id+'/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})});
+    showToast('Geofence '+(enabled?'aan':'uit'), true);
+  } catch(e) { showToast('Fout: '+e, false); }
+}
+async function deleteFence(id) {
+  if (!confirm('Zone verwijderen?')) return;
+  try {
+    const r = await fetch('/api/fences/'+id,{method:'DELETE'});
+    const d = await r.json();
+    if (d.ok) { showToast('Zone verwijderd', true); loadFences(); }
+    else showToast('Verwijderen mislukt', false);
+  } catch(e) { showToast('Fout: '+e, false); }
+}
+async function createFence() {
+  const name = el('fence-name').value || 'Zone';
+  const radius = +el('fence-radius').value;
+  const enter = el('fence-enter').checked;
+  const exit = el('fence-exit').checked;
+  // Use car's current location
+  if (!carLocation) { showToast('Locatie niet beschikbaar', false); return; }
+  try {
+    const r = await fetch('/api/fences',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name, lat:carLocation.lat, lon:carLocation.lon, radius, notify_enter:enter, notify_exit:exit})});
+    const d = await r.json();
+    if (d.ok) { showToast('Zone aangemaakt', true); closeSheet(); loadFences(); }
+    else showToast(d.error||'Aanmaken mislukt', false);
+  } catch(e) { showToast('Fout: '+e, false); }
+}
+
+// ── SWITCH PAGE HOOK ─────────────────────────────────────────────────────
+const _origSwitchPage = switchPage;
+switchPage = function(name) {
+  _origSwitchPage(name);
+  if (name === 'location') loadFences();
+};
+
+loadData();
+loadSchedules();
+setInterval(loadData, 300000);
+</script>
+</body>
+</html>
