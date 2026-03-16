@@ -11,6 +11,9 @@ import time
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
+TZ_LOCAL = ZoneInfo("Europe/Amsterdam")
 from io import StringIO
 from typing import Any, Dict, List, Optional
 import csv
@@ -77,7 +80,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' https://unpkg.com; "
             "style-src 'self' 'unsafe-inline' https://unpkg.com; "
-            "img-src 'self' data: https://*.tile.openstreetmap.org https://unpkg.com; "
+            "img-src 'self' data: https://*.basemaps.cartocdn.com https://unpkg.com; "
             "connect-src 'self' https://nominatim.openstreetmap.org; "
             "font-src 'self'"
         )
@@ -780,7 +783,7 @@ HTML = """<!DOCTYPE html>
   .card-map.expanded { grid-column: 1 / -1; }
   .card-map.expanded #map { height: 500px; }
   .card-map .label { padding: 1.5rem 1.5rem 0.75rem; }
-  #map { height: 260px; transition: height 0.3s ease; touch-action: none; }
+  #map { height: 260px; transition: height 0.3s ease; }
   .loc-info { padding: 0.5rem 1.5rem 1rem; font-size: 0.72rem; color: #64748b; }
 
   /* Controls */
@@ -1367,8 +1370,14 @@ async function loadLocation() {
       const lat = parseFloat(d.lat);
       const lon = parseFloat(d.lon);
       if (!map) {
-        map = L.map('map').setView([lat, lon], 14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        map = L.map('map', {
+          zoomControl: true,
+          scrollWheelZoom: true,
+          doubleClickZoom: true,
+          touchZoom: true,
+          boxZoom: true,
+        }).setView([lat, lon], 14);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
           maxZoom: 19, attribution: '© OpenStreetMap'
         }).addTo(map);
         marker = L.marker([lat, lon]).addTo(map);
@@ -1975,9 +1984,9 @@ def _format_trips(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
         trips.append({
             "tripId": t.get("tripId"),
             "reportTime": t.get("reportTime", start_ms),
-            "date": datetime.fromtimestamp(start_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d") if start_ms else "",
-            "start": datetime.fromtimestamp(start_ms / 1000, tz=timezone.utc).strftime("%H:%M") if start_ms else "",
-            "end": datetime.fromtimestamp(end_ms / 1000, tz=timezone.utc).strftime("%H:%M") if end_ms else "",
+            "date": datetime.fromtimestamp(start_ms / 1000, tz=TZ_LOCAL).strftime("%Y-%m-%d") if start_ms else "",
+            "start": datetime.fromtimestamp(start_ms / 1000, tz=TZ_LOCAL).strftime("%H:%M") if start_ms else "",
+            "end": datetime.fromtimestamp(end_ms / 1000, tz=TZ_LOCAL).strftime("%H:%M") if end_ms else "",
             "distance_km": round(dist, 1),
             "duration_min": round(duration_s / 60, 1),
             "avg_speed_kmh": round(t.get("avgSpeed", 0), 1),
