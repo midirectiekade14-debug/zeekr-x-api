@@ -480,7 +480,7 @@ def _create_session(username: str, client: ZeekrClient) -> str:
 
 def init_client_from_env() -> Optional[ZeekrClient]:
     """Try to init client from session file or env vars (legacy/startup)."""
-    session_file = os.path.join(os.path.dirname(__file__), "..", "session.json")
+    session_file = os.path.join(os.path.dirname(__file__), "session.json")
     if os.path.exists(session_file):
         try:
             with open(session_file, "r", encoding="utf-8") as f:
@@ -1583,7 +1583,7 @@ async def api_login(request: Request):
 
     # Fallback: use cached session.json if credentials match
     if c is None:
-        session_file = os.path.join(os.path.dirname(__file__), "..", "session.json")
+        session_file = os.path.join(os.path.dirname(__file__), "session.json")
         try:
             if os.path.exists(session_file):
                 with open(session_file, "r", encoding="utf-8") as f:
