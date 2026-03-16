@@ -15,8 +15,6 @@ Control and monitor your Zeekr electric vehicle from your browser. See battery l
 - **Charging Management** — Set charge limits, schedules, and travel plans
 - **Trip History** — View past trips with GPS routes, export to CSV
 - **Geofencing** — Get notified when your car enters/leaves an area
-- **Sentry Mode** — View security camera events and snapshots
-- **Car Configurator** — Visual 3D model with color picker (just for fun!)
 
 ---
 
@@ -165,13 +163,11 @@ client.start_climate(temperature=21)
 |-----|----------------|
 | `GET /` | Main dashboard page |
 | `GET /widget` | Compact status widget (for embedding) |
-| `GET /configurator` | Visual car configurator |
 | `GET /api/vehicles` | List of your vehicles |
 | `GET /api/status` | Current vehicle status |
 | `GET /api/trips` | Trip history |
 | `GET /api/trips/csv` | Export trips as CSV file |
 | `GET /api/fences` | Your geofences |
-| `GET /api/sentry/events` | Sentry mode events |
 | `GET /api/charge-plan` | Charging schedule |
 
 ---
@@ -204,7 +200,7 @@ All API signing keys (HMAC, RSA, AES) are **included** in `src/zeekr_ev_api/cons
 
 ## Credits
 
-Based on [Fryyyyy/zeekr_ev_api](https://github.com/Fryyyyy/zeekr_ev_api). Extended with dashboard, vehicle control, trip tracking, geofencing, sentry mode, scheduled actions, EU authentication support, and ADB token capture tool.
+Based on [Fryyyyy/zeekr_ev_api](https://github.com/Fryyyyy/zeekr_ev_api). Extended with dashboard, vehicle control, trip tracking, geofencing, scheduled actions, EU authentication support, and ADB token capture tool.
 
 Key extraction powered by [Wysie/zeekr_key_extractor](https://github.com/Wysie/zeekr_key_extractor).
 
