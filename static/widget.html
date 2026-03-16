@@ -2485,8 +2485,8 @@ let carLocation = null;
 function initHomeMap(lat, lon) {
   if (!homeMap) {
     homeMap = L.map('home-map-wrap', {
-      zoomControl: false, attributionControl: false,
-      dragging: true, scrollWheelZoom: false, doubleClickZoom: true,
+      zoomControl: true, attributionControl: false,
+      dragging: true, scrollWheelZoom: true, doubleClickZoom: true,
       touchZoom: true
     }).setView([lat, lon], 15);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
