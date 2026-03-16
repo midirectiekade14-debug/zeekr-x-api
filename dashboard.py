@@ -448,10 +448,14 @@ _scheduler_thread.start()
 
 
 def _get_session(request: Request) -> Optional[Dict[str, Any]]:
-    """Get session from cookie. No fallback — everyone must log in."""
+    """Get session from cookie, fall back to default session from session.json."""
     token = request.cookies.get(SESSION_COOKIE)
     if token and token in sessions:
         return sessions[token]
+    # Fallback: use the auto-loaded session from session.json
+    default_token = getattr(request.app.state, "default_session_token", None)
+    if default_token and default_token in sessions:
+        return sessions[default_token]
     return None
 
 
