@@ -77,7 +77,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' https://unpkg.com; "
             "style-src 'self' 'unsafe-inline' https://unpkg.com; "
-            "img-src 'self' data: https://*.tile.openstreetmap.org; "
+            "img-src 'self' data: https://*.tile.openstreetmap.org https://unpkg.com; "
             "connect-src 'self' https://nominatim.openstreetmap.org; "
             "font-src 'self'"
         )
@@ -1324,6 +1324,13 @@ async function togglePreheat(on) {
 </script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+// Fix Leaflet default marker icon path when loaded from CDN
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
 let map = null;
 let marker = null;
 
