@@ -24,8 +24,7 @@ Control and monitor your Zeekr electric vehicle from your browser. See battery l
 
 - A computer (Windows, Mac, or Linux)
 - Python 3.10 or newer ([download here](https://www.python.org/downloads/))
-- An Android phone with the Zeekr app installed
-- A USB cable to connect your phone to your computer
+- A phone (Android or iPhone) with the Zeekr app installed
 
 ### Step 1: Download This Project
 
@@ -48,7 +47,11 @@ pip install ".[dashboard]"
 
 ### Step 3: Get Your Login Token
 
-The Zeekr API requires a login token from your phone. This sounds complicated, but we've made it easy with an included tool.
+The Zeekr API requires a login token from your phone. Choose the instructions for your phone type below.
+
+---
+
+### 📱 Android
 
 #### Option A: Automatic Capture (Recommended)
 
@@ -83,6 +86,45 @@ python tools/capture_token.py --logcat-only
 ```
 
 This reads the existing app logs without restarting the app.
+
+---
+
+### 🍎 iPhone
+
+On iOS there is no ADB, so we use a **MITM proxy** to capture the login token from network traffic. No jailbreak required.
+
+#### What You Need
+
+- [mitmproxy](https://mitmproxy.org/) installed on your computer (`pip install mitmproxy` or `brew install mitmproxy`)
+- Your iPhone and computer on the **same Wi-Fi network**
+
+#### Step-by-step
+
+1. **Start the proxy on your computer:**
+   ```bash
+   python tools/capture_token.py --proxy
+   ```
+   This starts a local proxy on port **8080** and waits for the Zeekr login token.
+
+2. **Configure your iPhone to use the proxy:**
+   - Go to **Settings → Wi-Fi** → tap the ℹ️ next to your network
+   - Scroll down to **HTTP Proxy** → select **Manual**
+   - Set **Server** to your computer's local IP (e.g., `192.168.1.100`)
+   - Set **Port** to `8080`
+
+3. **Install the mitmproxy certificate** (required once):
+   - On your iPhone, open Safari and go to **http://mitm.it**
+   - Download the iOS certificate profile
+   - Go to **Settings → General → VPN & Device Management** → install the profile
+   - Go to **Settings → General → About → Certificate Trust Settings** → enable the mitmproxy certificate
+
+4. **Open the Zeekr app** on your iPhone and log in (or just open it if already logged in). The capture tool will detect the Bearer token automatically.
+
+5. A `session.json` file will be created. **Remove the proxy from your iPhone settings** when done.
+
+> **Tip:** You only need to do this once (and again when your token expires after ~7 days). After capturing, you can remove the proxy certificate from your iPhone if you prefer.
+
+---
 
 ### Step 4: Start the Dashboard
 
@@ -195,8 +237,9 @@ All API signing keys (HMAC, RSA, AES) are **included** in `src/zeekr_ev_api/cons
 ## Requirements
 
 - Python 3.10+
-- Android phone with Zeekr app (for token capture)
-- ADB (Android Debug Bridge) for the capture tool
+- Android or iPhone with the Zeekr app (for token capture)
+- **Android:** ADB (Android Debug Bridge) for the capture tool
+- **iPhone:** mitmproxy for network-based token capture
 
 ## Credits
 
